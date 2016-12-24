@@ -1,0 +1,6 @@
+*.suo
+*.user
+Capture/obj
+TestScreenshot/obj
+SolitaireAI/obj
+bin
