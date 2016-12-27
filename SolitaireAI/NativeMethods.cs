@@ -7,7 +7,8 @@ using System.Runtime.InteropServices;
 namespace SolitaireAI {
 	[System.Security.SuppressUnmanagedCodeSecurity()]
 	internal sealed class NativeMethods {
-		private NativeMethods() { }
+		[DllImport("msvcrt.dll", CallingConvention = CallingConvention.Cdecl)]
+		public static extern IntPtr memcpy(IntPtr dest, IntPtr src, long count);
 
 		internal static bool IsWindowInForeground(IntPtr hWnd) {
 			return hWnd == GetForegroundWindow();

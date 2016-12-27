@@ -40,27 +40,12 @@ namespace SolitaireAI {
 			Process[] processes = Process.GetProcessesByName(exeName);
 			if (processes.Length == 0) {
 				MessageBox.Show("No executable found matching: '" + exeName + "'");
+				btnInject.Enabled = true;
 				return;
 			}
 			
 			Process process = processes[0];
 			
-			/*
-			dynamic corewin = Windows.UI.Core.CoreWindow.GetForCurrentThread();
-			var interop = (ICoreWindowInterop)corewin;
-			var handle = interop.WindowHandle;
-			
-			List<IntPtr> windows = EnumerateProcessWindowHandles(process);
-			foreach(IntPtr window in windows) {
-				bool visible = NativeMethods.IsWindowVisible(window);
-				StringBuilder title = new StringBuilder(128);
-				int title_len = NativeMethods.GetWindowText(window, title, title.MaxCapacity);
-				Console.WriteLine(window + " Visible: " + visible);
-				if (title_len > 0) {
-					Console.WriteLine(window + " Title: " + title);
-				}
-			}*/
-
 			// If the process doesn't have a mainwindowhandle yet, skip it (we need to be able to get the hwnd to set foreground etc)
 			if (process.MainWindowHandle == IntPtr.Zero) { return; }
 
@@ -115,7 +100,7 @@ namespace SolitaireAI {
 		void CaptureScreenshot() {
 			this.Invoke(new MethodInvoker(
 				delegate () {
-					m_captureProcess.BringProcessWindowToFront();
+					//m_captureProcess.BringProcessWindowToFront();
 					// Initiate the screenshot of the CaptureInterface, the appropriate event handler within the target process will take care of the rest
 					Rectangle region = new Rectangle(0, 0, 0, 0);
 					TimeSpan timeout = new TimeSpan(0, 0, 1);
@@ -140,7 +125,7 @@ namespace SolitaireAI {
 								if (pictureBox1.Image != null) {
 									pictureBox1.Image.Dispose();
 								}
-								pictureBox1.Image = m_Solitaire.Run(screenshot.ToBitmap());
+								pictureBox1.Image = m_Solitaire.OnScreenshot(screenshot.ToBitmap());
 							}
 						));
 					}
