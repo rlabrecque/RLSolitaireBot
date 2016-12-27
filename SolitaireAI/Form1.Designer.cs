@@ -28,6 +28,7 @@
 			this.textBox1 = new System.Windows.Forms.TextBox();
 			this.txtDebugLog = new System.Windows.Forms.TextBox();
 			this.label6 = new System.Windows.Forms.Label();
+			this.m_CardsInStockLabel = new System.Windows.Forms.Label();
 			((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
 			this.SuspendLayout();
 			// 
@@ -80,11 +81,21 @@
 			this.label6.TabIndex = 17;
 			this.label6.Text = "EXE Name of Direct3D Application:";
 			// 
+			// m_CardsInStockLabel
+			// 
+			this.m_CardsInStockLabel.AutoSize = true;
+			this.m_CardsInStockLabel.Location = new System.Drawing.Point(5, 84);
+			this.m_CardsInStockLabel.Name = "m_CardsInStockLabel";
+			this.m_CardsInStockLabel.Size = new System.Drawing.Size(74, 13);
+			this.m_CardsInStockLabel.TabIndex = 18;
+			this.m_CardsInStockLabel.Text = "CardsInStock:";
+			// 
 			// Form1
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.ClientSize = new System.Drawing.Size(831, 521);
+			this.Controls.Add(this.m_CardsInStockLabel);
 			this.Controls.Add(this.label6);
 			this.Controls.Add(this.txtDebugLog);
 			this.Controls.Add(this.textBox1);
@@ -106,6 +117,7 @@
 		private System.Windows.Forms.TextBox textBox1;
 		private System.Windows.Forms.TextBox txtDebugLog;
 		private System.Windows.Forms.Label label6;
+		private System.Windows.Forms.Label m_CardsInStockLabel;
 	}
 }
 

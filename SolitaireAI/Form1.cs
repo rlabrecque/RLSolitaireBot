@@ -126,6 +126,25 @@ namespace SolitaireAI {
 									pictureBox1.Image.Dispose();
 								}
 								pictureBox1.Image = m_Solitaire.OnScreenshot(screenshot.ToBitmap());
+								string state = "CardsInStock: " + m_Solitaire.m_State.m_bCardsInStock + "\n";
+								foreach (Card? card in m_Solitaire.m_State.m_Foundation) {
+									if (card.HasValue) {
+										state += "Foundation: " + card.Value.m_Suit + " " + card.Value.m_Number + "\n";
+									}
+									else {
+										state += "Foundation: ----\n";
+									}
+								}
+								foreach (Card? card in m_Solitaire.m_State.m_Tableau) {
+									if (card.HasValue) {
+										state += "Tableau: " + card.Value.m_Suit + " " + card.Value.m_Number + "\n";
+									}
+									else {
+										state += "Tableau: ----\n";
+									}
+								}
+
+								m_CardsInStockLabel.Text = state;
 							}
 						));
 					}
