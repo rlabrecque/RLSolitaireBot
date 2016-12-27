@@ -90,6 +90,9 @@
     <Reference Include="EasyLoad64">
       <HintPath>..\Capture\EasyLoad\EasyLoad64.dll</HintPath>
     </Reference>
+    <Reference Include="Emgu.CV.UI">
+      <HintPath>..\Emgu.CV\bin\Emgu.CV.UI.dll</HintPath>
+    </Reference>
     <Reference Include="Emgu.CV.World">
       <HintPath>..\Emgu.CV\bin\Emgu.CV.World.dll</HintPath>
     </Reference>
@@ -133,6 +136,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Debug.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>

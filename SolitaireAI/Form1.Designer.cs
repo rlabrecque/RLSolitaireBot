@@ -48,7 +48,7 @@
             | System.Windows.Forms.AnchorStyles.Right)));
 			this.pictureBox1.Location = new System.Drawing.Point(193, 13);
 			this.pictureBox1.Name = "pictureBox1";
-			this.pictureBox1.Size = new System.Drawing.Size(1016, 577);
+			this.pictureBox1.Size = new System.Drawing.Size(626, 400);
 			this.pictureBox1.TabIndex = 2;
 			this.pictureBox1.TabStop = false;
 			// 
@@ -64,11 +64,11 @@
 			// 
 			this.txtDebugLog.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-			this.txtDebugLog.Location = new System.Drawing.Point(5, 596);
+			this.txtDebugLog.Location = new System.Drawing.Point(5, 419);
 			this.txtDebugLog.Multiline = true;
 			this.txtDebugLog.Name = "txtDebugLog";
 			this.txtDebugLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-			this.txtDebugLog.Size = new System.Drawing.Size(1204, 90);
+			this.txtDebugLog.Size = new System.Drawing.Size(814, 90);
 			this.txtDebugLog.TabIndex = 16;
 			// 
 			// label6
@@ -84,7 +84,7 @@
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-			this.ClientSize = new System.Drawing.Size(1221, 698);
+			this.ClientSize = new System.Drawing.Size(831, 521);
 			this.Controls.Add(this.label6);
 			this.Controls.Add(this.txtDebugLog);
 			this.Controls.Add(this.textBox1);

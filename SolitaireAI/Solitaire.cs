@@ -6,6 +6,8 @@ using System.Drawing;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
+using Emgu.CV.Util;
+using Emgu.CV.UI;
 
 
 namespace SolitaireAI {
@@ -17,8 +19,6 @@ namespace SolitaireAI {
 	}
 
 	struct Card {
-		public const int width = 85;
-		public const int height = 115;
 		int m_number;
 		Suit m_Suit;
 	}
@@ -44,58 +44,80 @@ namespace SolitaireAI {
 		public Bitmap OnScreenshot(Bitmap capture) {
 			var img = new Image<Bgr, byte>(capture);
 			var imgHsv = new Image<Hsv, byte>(capture);
-			var imgGray = img.Convert<Gray, byte>();
+			var imgGray = new Image<Gray, byte>(capture);
 			imgGray = imgGray.ThresholdBinary(new Gray(120), new Gray(255));
 
-			const int cardSpacing = 44;
+			// Values for the smallest window size: Width: 624, Height: 398
+            const int cardWidth = 55;
+            const int cardHeight = 75;
+            const int cardSpacing = 29;
+            const int leftOffset = 31;
+            const int topOffsetRow1 = 24;
+            const int topOffsetRow2 = 122;
 
 			// Stock
 			{
-				const int leftOffset = 49;
-				const int topOffset = 28;
+				var rect = new Rectangle(leftOffset, topOffsetRow1, cardWidth, cardHeight);
+				
+				using (Mat hist = new Mat())
+				using (Mat hist2 = new Mat())
+				using (VectorOfMat vm = new VectorOfMat())
+				using (VectorOfMat vm2 = new VectorOfMat()) {
+					vm.Push(imgHsv.GetSubRect(rect));
+					vm2.Push(new Image<Hsv, byte>(m_ReferenceImages.m_EmptyStock));
+					var channels = new int[] { 0 };
+					var histSize = new int[] { 256 };
+					var ranges = new float[] { 0, 256, };
+					CvInvoke.CalcHist(vm, channels, null, hist, histSize, ranges, false);
+					CvInvoke.CalcHist(vm2, channels, null, hist2, histSize, ranges, false);
 
-				var rect = new Rectangle(leftOffset, topOffset, Card.width, Card.height);
+					//CvInvoke.Normalize(hist, hist, 0, 255, NormType.MinMax);
+					//CvInvoke.Normalize(hist2, hist2, 0, 255, NormType.MinMax);
+
+
+					//double res = CvInvoke.CompareHist(hist, hist2, HistogramCompMethod.Bhattacharyya);
+					//Debug.Log("Cards in Stock: " + (res > 0.5));
+
+					double res = CvInvoke.CompareHist(hist, hist2, HistogramCompMethod.Correl);
+					m_State.m_bCardsInStock = (res < 0);
+					Debug.Log(res + " Cards in Stock: " + m_State.m_bCardsInStock);
+
+					/*for (int i = 0; i < 5; i++) {
+						HistogramCompMethod compare_method = (HistogramCompMethod)i;
+						double res = CvInvoke.CompareHist(hist, hist2, compare_method);
+
+						Debug.Log(" Method [" + i + "] : " + res);
+					}*/
+				}
+
 				CvInvoke.Rectangle(img, rect, new Bgr(255, 0, 0).MCvScalar);
-
-				//var hist = new Mat();
-				//CvInvoke.CalcHist(new Image<Hsv, byte>(m_ReferenceImages.m_EmptyStock), new int[] { 0, 1, 2 }, null, hist, new int[] { 8, 8, 8 }, new float[] {0, 256, 0, 256, 0, 256}, false);
-				//Console.WriteLine(hist);
 			}
 
 			// Waste
 			{
-				const int leftOffset = 178;
-				const int topOffset = 28;
-
-				var rect = new Rectangle(leftOffset, topOffset, Card.width, Card.height);
+				var rect = new Rectangle(leftOffset + cardWidth + cardSpacing, topOffsetRow1, cardWidth, cardHeight);
 				CvInvoke.Rectangle(img, rect, new Bgr(255, 0, 0).MCvScalar);
 			}
 
 			// Foundation
 			for (int i = 0; i < 4; ++i) {
-				const int leftOffset = 437;
-				const int topOffset = 28;
-				int rowCenter = leftOffset + (Card.width / 2) + ((Card.width + cardSpacing) * i);
-
-				var rect = new Rectangle(rowCenter - (Card.width / 2), topOffset, Card.width, Card.height);
+				var rect = new Rectangle(leftOffset + (cardWidth * 3) + (cardSpacing * 3) + ((cardWidth + cardSpacing) * i), topOffsetRow1, cardWidth, cardHeight);
 				CvInvoke.Rectangle(img, rect, new Bgr(255, 0, 0).MCvScalar);
 			}
 
 			// Tableau
 			for (int i = 0; i < 7; ++i) {
-				const int leftOffset = 49;
-				const int topOffset = 178;
-				int rowCenter = leftOffset + (Card.width / 2) + ((Card.width + cardSpacing) * i);
+				int rowCenter = leftOffset + (cardWidth / 2) + ((cardWidth + cardSpacing) * i);
 
 				int bottom = 0;
-				for (int y = img.Height - 1; y > topOffset; --y) {
+				for (int y = img.Height - 1; y > topOffsetRow2; --y) {
 					if (imgGray[y, rowCenter].Intensity > 0) {
 						bottom = y;
 						break;
 					}
 				}
 
-				var rect = new Rectangle(rowCenter - (Card.width / 2), topOffset, Card.width, bottom - topOffset);
+				var rect = new Rectangle(rowCenter - (cardWidth / 2), topOffsetRow2, cardWidth, bottom - topOffsetRow2);
 				CvInvoke.Rectangle(img, rect, new Bgr(255, 0, 0).MCvScalar);
 			}
 
