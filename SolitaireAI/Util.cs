@@ -5,6 +5,8 @@ using Emgu.CV.Structure;
 using Emgu.CV.Util;
 using Emgu.CV.UI;
 using System.Drawing;
+using System.Runtime.InteropServices;
+using System.Drawing.Imaging;
 
 namespace SolitaireAI {
 	public static class Util {
@@ -78,5 +80,25 @@ namespace SolitaireAI {
 
 			return correl;
 		}*/
+
+		public static Mat ByteArrayToMat(byte[] data, Size size, int stride) {
+			GCHandle handle = GCHandle.Alloc(data, GCHandleType.Pinned);
+			try {
+				using (Mat img = new Mat(size, DepthType.Cv8U, 4, handle.AddrOfPinnedObject(), stride)) {
+					Mat img2 = new Mat(size, DepthType.Cv8U, 3);
+					CvInvoke.CvtColor(img, img2, ColorConversion.Bgra2Bgr);
+					return img2;
+				}
+			}
+			finally {
+				if (handle.IsAllocated) {
+					handle.Free();
+				}
+			}
+		}
+
+		public static Bitmap CopyToBitmap(this Mat mat) {
+				return CvInvoke.RawDataToBitmap(mat.DataPointer, mat.Step, mat.Size, typeof(Bgr), mat.NumberOfChannels, CvInvoke.GetDepthType(mat.Depth), false);
+		}
 	}
 }

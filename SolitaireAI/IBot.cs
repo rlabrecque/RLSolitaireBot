@@ -5,7 +5,7 @@ namespace SolitaireAI {
 
 		public abstract void OnDetach();
 
-		public abstract System.Drawing.Bitmap OnGameFrame(System.Drawing.Bitmap capture);
+		public abstract System.Drawing.Bitmap OnGameFrame(byte[] data, System.Drawing.Size size, int stride);
 
 		public abstract string GetState();
 

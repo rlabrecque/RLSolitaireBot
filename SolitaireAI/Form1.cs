@@ -4,12 +4,9 @@ using System.Windows.Forms;
 using System.Diagnostics;
 using System.Threading;
 using System.IO;
-using System.Collections;
 using Capture.Interface;
 using Capture.Hook;
 using Capture;
-using System.Text;
-using System.Collections.Generic;
 
 namespace SolitaireAI {
 	public partial class Form1 : Form {
@@ -52,11 +49,10 @@ namespace SolitaireAI {
 			// Skip if the process is already hooked (and we want to hook multiple applications)
 			if (HookManager.IsHooked(process.Id)) { return; }
 
-			CaptureConfig cc = new CaptureConfig() { Direct3DVersion = Direct3DVersion.AutoDetect, ShowOverlay = false };
-
-			CaptureInterface captureInterface = new CaptureInterface();
+			CaptureConfig cc = new CaptureConfig() { Direct3DVersion = Direct3DVersion.AutoDetect, ShowOverlay = true };
+			
 			//captureInterface.RemoteMessage += new MessageReceivedEvent(CaptureInterface_RemoteMessage);
-			m_captureProcess = new CaptureProcess(process, cc, captureInterface);
+			m_captureProcess = new CaptureProcess(process, cc, new CaptureInterface());
 
 			Thread.Sleep(10);
 
@@ -113,10 +109,7 @@ namespace SolitaireAI {
 		void CaptureScreenshot() {
 			this.Invoke(new MethodInvoker(
 				delegate () {
-					Rectangle region = new Rectangle(0, 0, 0, 0);
-					TimeSpan timeout = new TimeSpan(0, 0, 1);
-					ImageFormat format = ImageFormat.Bitmap;
-					m_captureProcess.CaptureInterface.BeginGetScreenshot(region, timeout, ScreenshotCallback, null, format);
+					m_captureProcess.CaptureInterface.BeginGetScreenshot(Rectangle.Empty, new TimeSpan(0, 0, 1), ScreenshotCallback, null, format: ImageFormat.PixelData);
 				}
 			));
 		}
@@ -134,7 +127,7 @@ namespace SolitaireAI {
 								if (pictureBox1.Image != null) {
 									pictureBox1.Image.Dispose();
 								}
-								pictureBox1.Image = m_Script.OnGameFrame(screenshot.ToBitmap());
+								pictureBox1.Image = m_Script.OnGameFrame(screenshot.Data,  new Size(screenshot.Width, screenshot.Height), screenshot.Stride);
 								m_StateDisplayLabel.Text = m_Script.GetState();
 							}
 						));
