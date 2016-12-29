@@ -5,17 +5,34 @@ using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
 using Emgu.CV.Util;
+using Emgu.CV.UI;
 
 namespace SolitaireAI {
+	public enum Number {
+		A,
+		Two,
+		Three,
+		Four,
+		Five,
+		Six,
+		Seven,
+		Eight,
+		Nine,
+		Ten,
+		Jack,
+		Queen,
+		King
+	}
+
 	public enum Suit {
 		Diamond, // Red
 		Heart,   // Red
 		Spade,   // Black
-		Club,    // Black
+		Club     // Black
 	}
 
 	public struct Card {
-		public int m_Number;
+		public Number m_Number;
 		public Suit m_Suit;
 	}
 
@@ -27,20 +44,25 @@ namespace SolitaireAI {
 	}
 
 	public struct ReferenceImages {
-		public Bitmap m_EmptyStock;
-		public Bitmap[] m_Suits;
+		public Mat[] m_Numbers;
+		public Mat[] m_Suits;
 	}
 
 	public class Solitaire {
 		public State m_State;
 		ReferenceImages m_ReferenceImages;
+		Bitmap m_Return;
 
 		public Solitaire() {
-			m_ReferenceImages.m_EmptyStock = (Bitmap)Bitmap.FromFile("ReferenceImages/EmptyStock.bmp");
-			m_ReferenceImages.m_Suits = new Bitmap[4];
-			for(int i = 0; i < 4; ++i) {
+			m_ReferenceImages.m_Numbers = new Mat[13];
+			m_ReferenceImages.m_Suits = new Mat[4];
+			for (int i = 0; i < m_ReferenceImages.m_Numbers.Length; ++i) {
+				string filename = String.Format("ReferenceImages/Numbers/{0}.bmp", (Number)i);
+				m_ReferenceImages.m_Numbers[i] = CvInvoke.Imread(filename, ImreadModes.Grayscale);
+			}
+			for (int i = 0; i < m_ReferenceImages.m_Suits.Length; ++i) {
 				string filename = String.Format("ReferenceImages/Suits/{0}.bmp", (Suit)i);
-				m_ReferenceImages.m_Suits[i] = (Bitmap)Bitmap.FromFile(filename);
+				m_ReferenceImages.m_Suits[i] = CvInvoke.Imread(filename, ImreadModes.Grayscale);
 			}
 
 			m_State.m_Foundation = new Card?[4];
@@ -48,11 +70,17 @@ namespace SolitaireAI {
 		}
 
 		public Bitmap OnScreenshot(Bitmap capture) {
-			var img = new Image<Bgr, byte>(capture);
-			var imgHsv = new Image<Hsv, byte>(capture);
-			var imgGray = new Image<Gray, byte>(capture);
+			Mat img = new Image<Bgr, byte>(capture).Mat;
 
-			imgGray = imgGray.ThresholdBinary(new Gray(120), new Gray(255));
+			Mat imgHsv = new Mat();
+			CvInvoke.CvtColor(img, imgHsv, ColorConversion.Bgr2Hsv);
+
+			Mat imgGray = new Mat();
+			CvInvoke.CvtColor(img, imgGray, ColorConversion.Bgr2Gray);
+			CvInvoke.Threshold(imgGray, imgGray, 240, 255, ThresholdType.Binary);
+			//m_Return = imgGray.Bitmap;
+			Matrix<byte> imgGrayMatrix = new Matrix<byte>(imgGray.Rows, imgGray.Cols, imgGray.NumberOfChannels);
+			imgGray.CopyTo(imgGrayMatrix);
 
 			// Values for the smallest window size: Width: 624, Height: 398
 			/*const int cardWidth = 55;
@@ -73,75 +101,172 @@ namespace SolitaireAI {
 			// Stock
 			{
 				var rect = new Rectangle(leftOffset, topOffsetRow1, cardWidth, cardHeight);
-				imgHsv.ROI = rect;
-				m_State.m_bCardsInStock = (Util.CompareHistograms(imgHsv.Mat, new Image<Hsv, byte>(m_ReferenceImages.m_EmptyStock).Mat) < 0);
-				Util.Log(" Cards in Stock: " + m_State.m_bCardsInStock);
-				imgHsv.ROI = Rectangle.Empty;
+
+				Mat imgHsvRoi = new Mat(imgHsv, rect);
+				m_State.m_bCardsInStock = IsCard(imgHsvRoi);
 				
 				CvInvoke.Rectangle(img, rect, new Bgr(255, 0, 0).MCvScalar);
 			}
 
 			// Waste
 			{
-				var rect = new Rectangle(leftOffset + cardWidth + cardSpacing, topOffsetRow1, cardWidth, cardHeight);
+				const int startX = leftOffset + (cardWidth * 2) + (cardSpacing * 2);
+				const int endX = leftOffset + (cardWidth * 2) + cardSpacing;
+				const int centerY = topOffsetRow1 + (cardHeight / 2);
+
+				int left = 0;
+				for (int x = startX; x > endX; --x) {
+					if (imgGrayMatrix[centerY, x] == 255) {
+						break;
+					}
+					left = x;
+					print(x.ToString());
+				}
+
+				CvInvoke.Line(img, new Point(startX, topOffsetRow1 + (cardHeight / 2)), new Point(left, topOffsetRow1 + (cardHeight / 2)), new Bgr(Color.Red).MCvScalar);
+
+				var rect = new Rectangle(left - cardWidth, topOffsetRow1, cardWidth, cardHeight);
+
+				Mat card = new Mat(img, rect);
+				m_State.m_CurrentCardInWaste = ParseCard(card);
+
 				CvInvoke.Rectangle(img, rect, new Bgr(255, 0, 0).MCvScalar);
 			}
 
 			// Foundation
 			for (int i = 0; i < m_State.m_Foundation.Length; ++i) {
-				var rect = new Rectangle(leftOffset + (cardWidth * 3) + (cardSpacing * 3) + ((cardWidth + cardSpacing) * i), topOffsetRow1, cardWidth, cardHeight);
+				var rect = new Rectangle(leftOffset + (cardWidth * (3 + i)) + (cardSpacing * (3 + i)), topOffsetRow1, cardWidth, cardHeight);
+				Mat card = new Mat(img, rect);
+				m_State.m_Foundation[i] = ParseCard(card);
+
 				CvInvoke.Rectangle(img, rect, new Bgr(255, 0, 0).MCvScalar);
 			}
 
 			// Tableau
 			for (int i = 0; i < m_State.m_Tableau.Length; ++i) {
-				int rowCenter = leftOffset + (cardWidth / 2) + ((cardWidth + cardSpacing) * i);
+				int cardCenter = leftOffset + (cardWidth / 2) + ((cardWidth + cardSpacing) * i);
 
 				int bottom = 0;
-				for (int y = img.Height - 1; y > topOffsetRow2; --y) {
-					if (imgGray[y, rowCenter].Intensity > 0) {
-						bottom = y;
+				for (int y = imgGrayMatrix.Height - 1; y > topOffsetRow2 + cardHeight; --y) {
+					if (imgGrayMatrix[y, cardCenter] == 255) {
 						break;
 					}
+					bottom = y;
 				}
 
-				var rect = new Rectangle(rowCenter - (cardWidth / 2), bottom - cardHeight, cardWidth, cardHeight);
+				var rect = new Rectangle(cardCenter - (cardWidth / 2), bottom - cardHeight, cardWidth, cardHeight);
 				
-				m_State.m_Tableau[i] = ParseCard(new Mat(img.Mat, rect));
+				//if( i == 0)
+				m_State.m_Tableau[i] = ParseCard(new Mat(img, rect));
 
 				CvInvoke.Rectangle(img, rect, new Bgr(255, 0, 0).MCvScalar);
 			}
 
-			CvInvoke.Resize(img, img, new Size(900, 600));
-			capture = img.Bitmap;
+			//CvInvoke.Resize(img, img, new Size(900, 600));
 
-			return capture;
+			return m_Return ?? img.Bitmap;
 		}
 
-		Card ParseCard(Mat card) {
-			// Get Suit
-			var rect = new Rectangle(6, 34, 21, 24);
-			//new Mat(card, rect).Bitmap.Save("ReferenceImages/Suits/s.bmp");
+		Card? ParseCard(Mat card) {
+			// Check if a card exists at this location at all.
+			{
+				Mat cardHsv = new Mat();
+				CvInvoke.CvtColor(card, cardHsv, ColorConversion.Bgr2Hsv);
 
-			Suit suit = Suit.Diamond;
-			double lastSimilarity = double.MaxValue;
-			for (int i = 0; i < 4; ++i) {
-				double similarity = Util.GetSimilarity(new Mat(card, rect), new Image<Bgr, byte>(m_ReferenceImages.m_Suits[i]).Mat);
-				Util.Log((Suit)i + ": " + similarity);
-				if (similarity < lastSimilarity) {
-					suit = (Suit)i;
-					lastSimilarity = similarity;
+				if (!IsCard(cardHsv)) {
+					return null;
 				}
 			}
 
-			/*if(!bMatched) {
-				//throw new Exception("Suit Missmatch!");
-				Util.Log("Suit Missmatch!");
-			}*/
-			
-			CvInvoke.Rectangle(card, rect, new Bgr(0, 255, 0).MCvScalar);
+			// Get Suit
+			Suit suit = Suit.Diamond;
+			{
+				Rectangle rect = new Rectangle(4, 31, 22, 26);
+				Mat grey = new Mat(card, rect);
+				CvInvoke.CvtColor(grey, grey, ColorConversion.Bgr2Gray);
+				CvInvoke.Threshold(grey, grey, 200, 255, ThresholdType.Binary);
 
-			return new Card() { m_Number = 0, m_Suit = suit };
+				//grey.Bitmap.Save("ReferenceImages/Suits/s.bmp");
+				//m_Return = grey.Bitmap;
+
+				double lastSimilarity = 0;
+				for (int i = 0; i < m_ReferenceImages.m_Suits.Length; ++i) {
+					double similarity = Util.GetSimilarity(grey, m_ReferenceImages.m_Suits[i]);
+					//print((Suit)i + ": " + similarity);
+					if (similarity > lastSimilarity) {
+						suit = (Suit)i;
+						lastSimilarity = similarity;
+					}
+				}
+
+				CvInvoke.Rectangle(card, rect, new Bgr(0, 255, 0).MCvScalar);
+			}
+
+			// Get Number
+			Number number = 0;
+			{
+				Rectangle rect = new Rectangle(3, 3, 27, 27);
+				Mat grey = new Mat(card, rect);
+				CvInvoke.CvtColor(grey, grey, ColorConversion.Bgr2Gray);
+				CvInvoke.Threshold(grey, grey, 200, 255, ThresholdType.Binary);
+
+				double lastSimilarity = 0;
+				for (int i = 0; i < m_ReferenceImages.m_Numbers.Length; ++i) {
+					double similarity = Util.GetSimilarity(grey, m_ReferenceImages.m_Numbers[i]);
+					//print((Number)i + ": " + similarity);
+					if (similarity > lastSimilarity) {
+						number = (Number)i;
+						lastSimilarity = similarity;
+					}
+				}
+
+				CvInvoke.Rectangle(card, rect, new Bgr(0, 255, 0).MCvScalar);
+			}
+
+			return new Card() { m_Number = number, m_Suit = suit };
+		}
+
+		public bool IsCard(Mat img) {
+			Mat thresh = new Mat();
+			CvInvoke.InRange(img, new ScalarArray(new MCvScalar(55, 25, 25)), new ScalarArray(new MCvScalar(190, 256, 256)), thresh);
+			return (CvInvoke.Mean(thresh).V0 < 200);
+		}
+
+		public string GetState() {
+			string state = "";
+			state += "CardsInStock: " + m_State.m_bCardsInStock + "\n";
+
+			if (m_State.m_CurrentCardInWaste.HasValue) {
+				state += "CurrentCardInWaste: " + m_State.m_CurrentCardInWaste.Value.m_Number + " " + m_State.m_CurrentCardInWaste.Value.m_Suit + "\n";
+			}
+			else {
+				state += "CurrentCardInWaste: ----\n";
+			}
+
+			foreach (Card? card in m_State.m_Foundation) {
+				if (card.HasValue) {
+					state += "Foundation: " + card.Value.m_Number + " " + card.Value.m_Suit + "\n";
+				}
+				else {
+					state += "Foundation: ----\n";
+				}
+			}
+
+			foreach (Card? card in m_State.m_Tableau) {
+				if (card.HasValue) {
+					state += "Tableau: " + card.Value.m_Number + " " + card.Value.m_Suit + "\n";
+				}
+				else {
+					state += "Tableau: ----\n";
+				}
+			}
+
+			return state;
+		}
+
+		public void print(string message) {
+			Console.WriteLine(message);
+			System.Diagnostics.Debug.WriteLine(message);
 		}
 	}
 }

@@ -1,18 +1,13 @@
 ﻿using System;
-using System.Diagnostics;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
 using Emgu.CV.Util;
 using Emgu.CV.UI;
+using System.Drawing;
 
 namespace SolitaireAI {
 	public static class Util {
-		public static void Log(string message) {
-			Console.WriteLine(message);
-			Debug.WriteLine(message);
-		}
-		
 		public static double CompareHistograms(Mat img, Mat img2) {
 			using (Mat hist = new Mat())
 			using (Mat hist2 = new Mat())
@@ -36,8 +31,19 @@ namespace SolitaireAI {
 			}
 		}
 
-		// Compare two images by getting the L2 error (square-root of sum of squared error).
 		public static double GetSimilarity(Mat A, Mat B) {
+			Mat result = new Mat();
+			CvInvoke.MatchTemplate(A, B, result, TemplateMatchingType.CcorrNormed);
+			double[] minValues, maxValues;
+			Point[] minLocations, maxLocations;
+			result.MinMax(out minValues, out maxValues, out minLocations, out maxLocations);
+
+			// You can try different values of the threshold. I guess somewhere between 0.75 and 0.95 would be good.
+			return maxValues[0];
+		}
+
+		// Compare two images by getting the L2 error (square-root of sum of squared error).
+		public static double GetSimilarityL2(Mat A, Mat B) {
 			if (A.Rows > 0 && A.Rows == B.Rows && A.Cols > 0 && A.Cols == B.Cols) {
 				// Calculate the L2 relative error between images.
 				double errorL2 = CvInvoke.Norm(A, B, NormType.L2);
