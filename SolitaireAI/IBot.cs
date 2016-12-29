@@ -1,5 +1,10 @@
 ﻿
 namespace SolitaireAI {
+	public interface IBotInfo {
+		IBot GetBot { get; }
+		string GetExecutableName { get; }
+	}
+
 	public abstract class IBot {
 		public abstract void OnAttach();
 

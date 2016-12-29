@@ -54,9 +54,24 @@ namespace SolitaireAI {
 	}
 
 	public static class CvScalarColor {
-		public static MCvScalar Red = new Bgr(Color.Red).MCvScalar;
-		public static MCvScalar Green = new Bgr(Color.Green).MCvScalar;
-		public static MCvScalar Blue = new Bgr(Color.Blue).MCvScalar;
+		public static readonly MCvScalar Red = new Bgr(Color.Red).MCvScalar;
+		public static readonly MCvScalar Green = new Bgr(Color.Green).MCvScalar;
+		public static readonly MCvScalar Blue = new Bgr(Color.Blue).MCvScalar;
+	}
+
+	public static class ScalarArrayColor {
+		public static readonly ScalarArray HsvGreenLowerBound = new ScalarArray(new MCvScalar(55, 25, 25));
+		public static readonly ScalarArray HsvGreenUpperBound = new ScalarArray(new MCvScalar(190, 256, 256));
+	}
+
+	public class SolitaireInfo : IBotInfo {
+		public override string ToString() {
+			return "Solitaire";
+		}
+
+		public string GetExecutableName { get { return "Solitaire.exe"; } }
+		public string Author { get { return "Riley Labrecque"; } }
+		public IBot GetBot { get { return new Solitaire(); } }
 	}
 
 	public class Solitaire : IBot {
@@ -247,8 +262,8 @@ namespace SolitaireAI {
 
 		public bool IsCard(Mat img) {
 			using (Mat thresh = new Mat()) {
-				ScalarArray lower = new ScalarArray(new MCvScalar(55, 25, 25));
-				ScalarArray upper = new ScalarArray(new MCvScalar(190, 256, 256));
+				ScalarArray lower = ScalarArrayColor.HsvGreenLowerBound;
+				ScalarArray upper = ScalarArrayColor.HsvGreenUpperBound;
 				CvInvoke.InRange(img, lower, upper, thresh);
 				return (CvInvoke.Mean(thresh).V0 < 200);
 			}

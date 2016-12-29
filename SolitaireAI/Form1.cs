@@ -10,7 +10,7 @@ using Capture;
 
 namespace SolitaireAI {
 	public partial class Form1 : Form {
-		IBot m_Script;
+		IBot m_Bot;
 		CaptureProcess m_captureProcess;
 
 		public Form1() {
@@ -18,6 +18,9 @@ namespace SolitaireAI {
 		}
 
 		private void Form1_Load(object sender, EventArgs e) {
+			comboBox1.Items.Add(new SolitaireInfo());
+			comboBox1.SelectedIndex = 0;
+
 			AttachProcess();
 		}
 
@@ -33,7 +36,7 @@ namespace SolitaireAI {
 		private void AttachProcess() {
 			btnInject.Enabled = false;
 
-			string exeName = Path.GetFileNameWithoutExtension(textBox1.Text);
+			string exeName = Path.GetFileNameWithoutExtension(((IBotInfo)comboBox1.SelectedItem).GetExecutableName);
 			Process[] processes = Process.GetProcessesByName(exeName);
 			if (processes.Length == 0) {
 				MessageBox.Show("No executable found matching: '" + exeName + "'");
@@ -59,9 +62,9 @@ namespace SolitaireAI {
 			btnInject.Text = "Detach";
 			btnInject.Enabled = true;
 
-			m_Script = new Solitaire();
+			m_Bot = ((IBotInfo)comboBox1.SelectedItem).GetBot;
 
-			m_Script.OnAttach();
+			m_Bot.OnAttach();
 			
 			CaptureScreenshot();
 
@@ -80,7 +83,7 @@ namespace SolitaireAI {
 
 		private void DetachProcess() {
 			myTimer.Stop();
-			m_Script.OnDetach();
+			m_Bot.OnDetach();
 			HookManager.RemoveHookedProcess(m_captureProcess.Process.Id);
 			m_captureProcess.CaptureInterface.Disconnect();
 			m_captureProcess = null;
@@ -127,8 +130,8 @@ namespace SolitaireAI {
 								if (pictureBox1.Image != null) {
 									pictureBox1.Image.Dispose();
 								}
-								pictureBox1.Image = m_Script.OnGameFrame(screenshot.Data,  new Size(screenshot.Width, screenshot.Height), screenshot.Stride);
-								m_StateDisplayLabel.Text = m_Script.GetState();
+								pictureBox1.Image = m_Bot.OnGameFrame(screenshot.Data,  new Size(screenshot.Width, screenshot.Height), screenshot.Stride);
+								m_StateDisplayLabel.Text = m_Bot.GetState();
 							}
 						));
 					}
