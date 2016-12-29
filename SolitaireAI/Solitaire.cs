@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Runtime.InteropServices;
 using System.Text;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
@@ -10,6 +9,7 @@ using Emgu.CV.Util;
 
 namespace SolitaireAI {
 	public enum Number {
+		NONE = -1,
 		A,
 		Two,
 		Three,
@@ -22,14 +22,18 @@ namespace SolitaireAI {
 		Ten,
 		Jack,
 		Queen,
-		King
+		King,
+
+		TOTAL
 	}
 
 	public enum Suit {
 		Diamond, // Red
 		Heart,   // Red
 		Spade,   // Black
-		Club     // Black
+		Club,    // Black
+
+		TOTAL
 	}
 
 	public struct Card {
@@ -39,9 +43,9 @@ namespace SolitaireAI {
 
 	public struct State {
 		public bool m_bCardsInStock;
-		public Card? m_CurrentCardInWaste;
-		public Card?[] m_Foundation;
-		public Card?[] m_Tableau;
+		public Card m_CurrentCardInWaste;
+		public Card[] m_Foundation;
+		public Card[] m_Tableau;
 	}
 
 	public struct ReferenceImages {
@@ -49,15 +53,13 @@ namespace SolitaireAI {
 		public Mat[] m_Suits;
 	}
 
-	public class Solitaire : IBot {
-		// Values for the smallest window size: Width: 624, Height: 398
-		/*const int cardWidth = 55;
-		const int cardHeight = 75;
-		const int cardSpacing = 29;
-		const int leftOffset = 31;
-		const int topOffsetRow1 = 24;
-		const int topOffsetRow2 = 122;*/
+	public static class CvScalarColor {
+		public static MCvScalar Red = new Bgr(Color.Red).MCvScalar;
+		public static MCvScalar Green = new Bgr(Color.Green).MCvScalar;
+		public static MCvScalar Blue = new Bgr(Color.Blue).MCvScalar;
+	}
 
+	public class Solitaire : IBot {
 		// Values for the biggest window size: Width: 1920, Height: 1080
 		const int cardWidth = 141;
 		const int cardHeight = 191;
@@ -65,34 +67,35 @@ namespace SolitaireAI {
 		const int leftOffset = 248;
 		const int topOffsetRow1 = 47;
 		const int topOffsetRow2 = 295;
+		const int foundationSlots = 4;
+		const int tableauSlots = 7;
 
 		State m_State;
 		ReferenceImages m_ReferenceImages;
-		Bitmap m_Return;
 
 		public override void OnAttach() {
-			m_ReferenceImages.m_Numbers = new Mat[13];
-			for (int i = 0; i < m_ReferenceImages.m_Numbers.Length; ++i) {
+			m_ReferenceImages.m_Numbers = new Mat[(int)Number.TOTAL];
+			for (int i = 0; i < (int)Number.TOTAL; ++i) {
 				string filename = String.Format("ReferenceImages/Numbers/{0}.bmp", (Number)i);
 				m_ReferenceImages.m_Numbers[i] = CvInvoke.Imread(filename, ImreadModes.Grayscale);
 			}
 
-			m_ReferenceImages.m_Suits = new Mat[4];
-			for (int i = 0; i < m_ReferenceImages.m_Suits.Length; ++i) {
+			m_ReferenceImages.m_Suits = new Mat[(int)Suit.TOTAL];
+			for (int i = 0; i < (int)Suit.TOTAL; ++i) {
 				string filename = String.Format("ReferenceImages/Suits/{0}.bmp", (Suit)i);
 				m_ReferenceImages.m_Suits[i] = CvInvoke.Imread(filename, ImreadModes.Grayscale);
 			}
 
-			m_State.m_Foundation = new Card?[4];
-			m_State.m_Tableau = new Card?[7];
+			m_State.m_Foundation = new Card[foundationSlots];
+			m_State.m_Tableau = new Card[tableauSlots];
 		}
 
 		public override void OnDetach() {
-			for (int i = 0; i < m_ReferenceImages.m_Numbers.Length; ++i) {
+			for (int i = 0; i < (int)Number.TOTAL; ++i) {
 				m_ReferenceImages.m_Numbers[i].Dispose();
 			}
 
-			for (int i = 0; i < m_ReferenceImages.m_Suits.Length; ++i) {
+			for (int i = 0; i < (int)Suit.TOTAL; ++i) {
 				m_ReferenceImages.m_Suits[i].Dispose();
 			}
 		}
@@ -110,7 +113,7 @@ namespace SolitaireAI {
 						m_State.m_bCardsInStock = IsCard(imgHsvRoi);
 					}
 
-					CvInvoke.Rectangle(img, rect, new Bgr(Color.Blue).MCvScalar);
+					CvInvoke.Rectangle(img, rect, CvScalarColor.Blue);
 				}
 
 				// Waste
@@ -129,7 +132,7 @@ namespace SolitaireAI {
 						rightEdge = x;
 					}
 
-					CvInvoke.Line(img, new Point(startX, centerY), new Point(rightEdge, centerY), new Bgr(Color.Red).MCvScalar);
+					CvInvoke.Line(img, new Point(startX, centerY), new Point(rightEdge, centerY), CvScalarColor.Red);
 
 					var rect = new Rectangle(rightEdge - cardWidth, topOffsetRow1, cardWidth, cardHeight);
 
@@ -137,22 +140,22 @@ namespace SolitaireAI {
 						m_State.m_CurrentCardInWaste = ParseCard(card);
 					}
 
-					CvInvoke.Rectangle(img, rect, new Bgr(Color.Blue).MCvScalar);
+					CvInvoke.Rectangle(img, rect, CvScalarColor.Blue);
 				}
 
 				// Foundation
-				for (int i = 0; i < m_State.m_Foundation.Length; ++i) {
+				for (int i = 0; i < foundationSlots; ++i) {
 					var rect = new Rectangle(leftOffset + (cardWidth * (3 + i)) + (cardSpacing * (3 + i)), topOffsetRow1, cardWidth, cardHeight);
 
 					using (Mat card = new Mat(img, rect)) {
 						m_State.m_Foundation[i] = ParseCard(card);
 					}
 
-					CvInvoke.Rectangle(img, rect, new Bgr(Color.Blue).MCvScalar);
+					CvInvoke.Rectangle(img, rect, CvScalarColor.Blue);
 				}
 
 				// Tableau
-				for (int i = 0; i < m_State.m_Tableau.Length; ++i) {
+				for (int i = 0; i < tableauSlots; ++i) {
 					int startHeight = img.Height - 1;
 					int stopHeight = topOffsetRow2 + cardHeight;
 					int cardCenterX = leftOffset + (cardWidth / 2) + ((cardWidth + cardSpacing) * i);
@@ -167,7 +170,7 @@ namespace SolitaireAI {
 						bottomEdge = y;
 					}
 
-					CvInvoke.Line(img, new Point(cardCenterX, img.Height - 1), new Point(cardCenterX, bottomEdge), new Bgr(Color.Red).MCvScalar);
+					CvInvoke.Line(img, new Point(cardCenterX, img.Height - 1), new Point(cardCenterX, bottomEdge), CvScalarColor.Red);
 					
 					var rect = new Rectangle(cardCenterX - (cardWidth / 2), bottomEdge - cardHeight, cardWidth, cardHeight);
 
@@ -175,20 +178,20 @@ namespace SolitaireAI {
 						m_State.m_Tableau[i] = ParseCard(card);
 					}
 
-					CvInvoke.Rectangle(img, rect, new Bgr(Color.Blue).MCvScalar);
+					CvInvoke.Rectangle(img, rect, CvScalarColor.Blue);
 				}
 
 				return img.CopyToBitmap();
 			}
 		}
 
-		Card? ParseCard(Mat card) {
-			// Check if a card exists at this location at all.
+		Card ParseCard(Mat card) {
+			// First check if a card exists at this location
 			using (Mat cardHsv = new Mat()) {
 				CvInvoke.CvtColor(card, cardHsv, ColorConversion.Bgr2Hsv);
 
 				if (!IsCard(cardHsv)) {
-					return null;
+					return new Card() { m_Number = Number.NONE };
 				}
 			}
 
@@ -204,7 +207,7 @@ namespace SolitaireAI {
 					//m_Return = grey.Bitmap;
 
 					double lastSimilarity = 0;
-					for (int i = 0; i < m_ReferenceImages.m_Suits.Length; ++i) {
+					for (int i = 0; i < (int)Suit.TOTAL; ++i) {
 						double similarity = Util.GetSimilarity(grey, m_ReferenceImages.m_Suits[i]);
 						//print((Suit)i + ": " + similarity);
 						if (similarity > lastSimilarity) {
@@ -214,11 +217,11 @@ namespace SolitaireAI {
 					}
 				}
 
-				CvInvoke.Rectangle(card, rect, new Bgr(Color.Green).MCvScalar);
+				CvInvoke.Rectangle(card, rect, CvScalarColor.Green);
 			}
 
 			// Get Number
-			Number number = 0;
+			Number number = Number.NONE;
 			{
 				Rectangle rect = new Rectangle(3, 3, 27, 27);
 				using (Mat grey = new Mat(card, rect)) {
@@ -226,7 +229,7 @@ namespace SolitaireAI {
 					CvInvoke.Threshold(grey, grey, 200, 255, ThresholdType.Binary);
 
 					double lastSimilarity = 0;
-					for (int i = 0; i < m_ReferenceImages.m_Numbers.Length; ++i) {
+					for (int i = 0; i < (int)Number.TOTAL; ++i) {
 						double similarity = Util.GetSimilarity(grey, m_ReferenceImages.m_Numbers[i]);
 						//print((Number)i + ": " + similarity);
 						if (similarity > lastSimilarity) {
@@ -236,7 +239,7 @@ namespace SolitaireAI {
 					}
 				}
 
-				CvInvoke.Rectangle(card, rect, new Bgr(Color.Green).MCvScalar);
+				CvInvoke.Rectangle(card, rect, CvScalarColor.Green);
 			}
 
 			return new Card() { m_Number = number, m_Suit = suit };
@@ -244,32 +247,34 @@ namespace SolitaireAI {
 
 		public bool IsCard(Mat img) {
 			using (Mat thresh = new Mat()) {
-				CvInvoke.InRange(img, new ScalarArray(new MCvScalar(55, 25, 25)), new ScalarArray(new MCvScalar(190, 256, 256)), thresh);
+				ScalarArray lower = new ScalarArray(new MCvScalar(55, 25, 25));
+				ScalarArray upper = new ScalarArray(new MCvScalar(190, 256, 256));
+				CvInvoke.InRange(img, lower, upper, thresh);
 				return (CvInvoke.Mean(thresh).V0 < 200);
 			}
 		}
 
 		public override string GetState() {
-			StringBuilder state = new StringBuilder(120);
+			StringBuilder state = new StringBuilder(250);
 			state.Append("CardsInStock: ");
 			state.AppendLine(m_State.m_bCardsInStock.ToString());
 
 			state.Append("CurrentCardInWaste: ");
-			if (m_State.m_CurrentCardInWaste.HasValue) {
-				state.Append(m_State.m_CurrentCardInWaste.Value.m_Number);
+			if (m_State.m_CurrentCardInWaste.m_Number != Number.NONE) {
+				state.Append(m_State.m_CurrentCardInWaste.m_Number);
 				state.Append(" ");
-				state.AppendLine(m_State.m_CurrentCardInWaste.Value.m_Suit.ToString());
+				state.AppendLine(m_State.m_CurrentCardInWaste.m_Suit.ToString());
 			}
 			else {
 				state.AppendLine("----");
 			}
 
 			state.AppendLine("Foundation: ");
-			foreach (Card? card in m_State.m_Foundation) {
-				if (card.HasValue) {
-					state.Append(card.Value.m_Number);
+			foreach (Card card in m_State.m_Foundation) {
+				if (card.m_Number != Number.NONE) {
+					state.Append(card.m_Number);
 					state.Append(" ");
-					state.AppendLine(card.Value.m_Suit.ToString());
+					state.AppendLine(card.m_Suit.ToString());
 				}
 				else {
 					state.AppendLine("----");
@@ -277,11 +282,12 @@ namespace SolitaireAI {
 			}
 
 			state.AppendLine("Tableau: ");
-			foreach (Card? card in m_State.m_Tableau) {
-				if (card.HasValue) {
-					state.Append(card.Value.m_Number);
+			foreach (Card card in m_State.m_Tableau) {
+				if (card.m_Number != Number.NONE) {
+					state.Append(card.m_Number);
 					state.Append(" ");
-					state.AppendLine(card.Value.m_Suit.ToString());
+					state.AppendLine(card.m_Suit.ToString());
+
 				}
 				else {
 					state.AppendLine("----");

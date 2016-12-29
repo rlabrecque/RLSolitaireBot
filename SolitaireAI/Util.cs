@@ -34,14 +34,14 @@ namespace SolitaireAI {
 		}
 
 		public static double GetSimilarity(Mat A, Mat B) {
-			Mat result = new Mat();
-			CvInvoke.MatchTemplate(A, B, result, TemplateMatchingType.CcoeffNormed);
-			double[] minValues, maxValues;
-			Point[] minLocations, maxLocations;
-			result.MinMax(out minValues, out maxValues, out minLocations, out maxLocations);
+			using (Mat result = new Mat()) {
+				CvInvoke.MatchTemplate(A, B, result, TemplateMatchingType.CcoeffNormed);
+				double[] minValues, maxValues;
+				Point[] minLocations, maxLocations;
+				result.MinMax(out minValues, out maxValues, out minLocations, out maxLocations);
 
-			// You can try different values of the threshold. I guess somewhere between 0.75 and 0.95 would be good.
-			return maxValues[0];
+				return maxValues[0];
+			}
 		}
 
 		// Compare two images by getting the L2 error (square-root of sum of squared error).
