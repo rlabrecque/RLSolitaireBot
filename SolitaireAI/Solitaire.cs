@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Text;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
 using Emgu.CV.Util;
-using Emgu.CV.UI;
 
 namespace SolitaireAI {
 	public enum Number {
@@ -48,12 +48,12 @@ namespace SolitaireAI {
 		public Mat[] m_Suits;
 	}
 
-	public class Solitaire {
-		public State m_State;
+	public class Solitaire : IBot {
+		State m_State;
 		ReferenceImages m_ReferenceImages;
 		Bitmap m_Return;
 
-		public Solitaire() {
+		public override void OnAttach() {
 			m_ReferenceImages.m_Numbers = new Mat[13];
 			m_ReferenceImages.m_Suits = new Mat[4];
 			for (int i = 0; i < m_ReferenceImages.m_Numbers.Length; ++i) {
@@ -69,19 +69,15 @@ namespace SolitaireAI {
 			m_State.m_Tableau = new Card?[7];
 		}
 
-		public Bitmap OnScreenshot(Bitmap capture) {
+		public override void OnDetach() {
+		}
+
+		public override Bitmap OnGameFrame(Bitmap capture) {
 			Mat img = new Image<Bgr, byte>(capture).Mat;
 
 			Mat imgHsv = new Mat();
 			CvInvoke.CvtColor(img, imgHsv, ColorConversion.Bgr2Hsv);
-
-			//Mat imgGray = new Mat();
-			//CvInvoke.CvtColor(img, imgGray, ColorConversion.Bgr2Gray);
-			//CvInvoke.Threshold(imgGray, imgGray, 240, 255, ThresholdType.Binary);
-			//m_Return = imgGray.Bitmap;
-			//Matrix<byte> imgGrayMatrix = new Matrix<byte>(imgGray.Rows, imgGray.Cols, imgGray.NumberOfChannels);
-			//imgGray.CopyTo(imgGrayMatrix);
-
+			
 			// Values for the smallest window size: Width: 624, Height: 398
 			/*const int cardWidth = 55;
 			const int cardHeight = 75;
@@ -240,41 +236,46 @@ namespace SolitaireAI {
 			return (CvInvoke.Mean(thresh).V0 < 200);
 		}
 
-		public string GetState() {
-			string state = "";
-			state += "CardsInStock: " + m_State.m_bCardsInStock + "\n";
+		public override string GetState() {
+			StringBuilder state = new StringBuilder(120);
+			state.Append("CardsInStock: ");
+			state.AppendLine(m_State.m_bCardsInStock.ToString());
 
+			state.Append("CurrentCardInWaste: ");
 			if (m_State.m_CurrentCardInWaste.HasValue) {
-				state += "CurrentCardInWaste: " + m_State.m_CurrentCardInWaste.Value.m_Number + " " + m_State.m_CurrentCardInWaste.Value.m_Suit + "\n";
+				state.Append(m_State.m_CurrentCardInWaste.Value.m_Number);
+				state.Append(" ");
+				state.AppendLine(m_State.m_CurrentCardInWaste.Value.m_Suit.ToString());
 			}
 			else {
-				state += "CurrentCardInWaste: ----\n";
+				state.AppendLine("----");
 			}
 
+			state.AppendLine("Foundation: ");
 			foreach (Card? card in m_State.m_Foundation) {
 				if (card.HasValue) {
-					state += "Foundation: " + card.Value.m_Number + " " + card.Value.m_Suit + "\n";
+					state.Append(card.Value.m_Number);
+					state.Append(" ");
+					state.AppendLine(card.Value.m_Suit.ToString());
 				}
 				else {
-					state += "Foundation: ----\n";
+					state.AppendLine("----");
 				}
 			}
 
+			state.AppendLine("Tableau: ");
 			foreach (Card? card in m_State.m_Tableau) {
 				if (card.HasValue) {
-					state += "Tableau: " + card.Value.m_Number + " " + card.Value.m_Suit + "\n";
+					state.Append(card.Value.m_Number);
+					state.Append(" ");
+					state.AppendLine(card.Value.m_Suit.ToString());
 				}
 				else {
-					state += "Tableau: ----\n";
+					state.AppendLine("----");
 				}
 			}
 
-			return state;
-		}
-
-		public void print(string message) {
-			Console.WriteLine(message);
-			System.Diagnostics.Debug.WriteLine(message);
+			return state.ToString();
 		}
 	}
 }

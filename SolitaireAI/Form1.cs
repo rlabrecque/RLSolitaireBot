@@ -13,7 +13,7 @@ using System.Collections.Generic;
 
 namespace SolitaireAI {
 	public partial class Form1 : Form {
-		Solitaire m_Solitaire;
+		IBot m_Script;
 		CaptureProcess m_captureProcess;
 
 		public Form1() {
@@ -52,10 +52,10 @@ namespace SolitaireAI {
 			// Skip if the process is already hooked (and we want to hook multiple applications)
 			if (HookManager.IsHooked(process.Id)) { return; }
 
-			CaptureConfig cc = new CaptureConfig() { Direct3DVersion = Direct3DVersion.AutoDetect, ShowOverlay = true };
+			CaptureConfig cc = new CaptureConfig() { Direct3DVersion = Direct3DVersion.AutoDetect, ShowOverlay = false };
 
 			CaptureInterface captureInterface = new CaptureInterface();
-			captureInterface.RemoteMessage += new MessageReceivedEvent(CaptureInterface_RemoteMessage);
+			//captureInterface.RemoteMessage += new MessageReceivedEvent(CaptureInterface_RemoteMessage);
 			m_captureProcess = new CaptureProcess(process, cc, captureInterface);
 
 			Thread.Sleep(10);
@@ -63,12 +63,28 @@ namespace SolitaireAI {
 			btnInject.Text = "Detach";
 			btnInject.Enabled = true;
 
-			m_Solitaire = new Solitaire();
+			m_Script = new Solitaire();
+
+			m_Script.OnAttach();
 			
 			CaptureScreenshot();
+
+			myTimer.Tick += new EventHandler(TimerEventProcessor);
+			myTimer.Interval = 100;
+			myTimer.Start();
+		}
+
+		System.Windows.Forms.Timer myTimer = new System.Windows.Forms.Timer();
+		void TimerEventProcessor(Object myObject, EventArgs myEventArgs) {
+			const UInt32 WM_PAINT = 0x000F;
+			IntPtr dc = NativeMethods.GetDC(m_captureProcess.Process.MainWindowHandle);
+			NativeMethods.PostMessage(m_captureProcess.Process.MainWindowHandle, WM_PAINT, dc, IntPtr.Zero);
+			NativeMethods.ReleaseDC(m_captureProcess.Process.MainWindowHandle, dc);
 		}
 
 		private void DetachProcess() {
+			myTimer.Stop();
+			m_Script.OnDetach();
 			HookManager.RemoveHookedProcess(m_captureProcess.Process.Id);
 			m_captureProcess.CaptureInterface.Disconnect();
 			m_captureProcess = null;
@@ -77,7 +93,8 @@ namespace SolitaireAI {
 			btnInject.Enabled = true;
 		}
 
-		void CaptureInterface_RemoteMessage(MessageReceivedEventArgs message) {
+		/*void CaptureInterface_RemoteMessage(MessageReceivedEventArgs message) {
+			System.Diagnostics.Debug.WriteLine(String.Format("{0}\r\n{1}", message, txtDebugLog.Text));
 			txtDebugLog.Invoke(new MethodInvoker(
 				delegate () {
 					txtDebugLog.Text = String.Format("{0}\r\n{1}", message, txtDebugLog.Text);
@@ -91,13 +108,11 @@ namespace SolitaireAI {
 					txtDebugLog.Text = String.Format("{0}:{1}\r\n{2}", clientPID, message, txtDebugLog.Text);
 				}
 			));
-		}
+		}*/
 		
 		void CaptureScreenshot() {
 			this.Invoke(new MethodInvoker(
 				delegate () {
-					//m_captureProcess.BringProcessWindowToFront();
-					// Initiate the screenshot of the CaptureInterface, the appropriate event handler within the target process will take care of the rest
 					Rectangle region = new Rectangle(0, 0, 0, 0);
 					TimeSpan timeout = new TimeSpan(0, 0, 1);
 					ImageFormat format = ImageFormat.Bitmap;
@@ -119,8 +134,8 @@ namespace SolitaireAI {
 								if (pictureBox1.Image != null) {
 									pictureBox1.Image.Dispose();
 								}
-								pictureBox1.Image = m_Solitaire.OnScreenshot(screenshot.ToBitmap());
-								m_StateDisplayLabel.Text = m_Solitaire.GetState();
+								pictureBox1.Image = m_Script.OnGameFrame(screenshot.ToBitmap());
+								m_StateDisplayLabel.Text = m_Script.GetState();
 							}
 						));
 					}
