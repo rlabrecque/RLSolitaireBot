@@ -112,7 +112,7 @@
 			this.Controls.Add(this.pictureBox1);
 			this.Controls.Add(this.btnInject);
 			this.Name = "Form1";
-			this.Text = "Test Screenshot Direct3D API Hook";
+			this.Text = "SolitaireAI";
 			this.Load += new System.EventHandler(this.Form1_Load);
 			((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
 			this.ResumeLayout(false);

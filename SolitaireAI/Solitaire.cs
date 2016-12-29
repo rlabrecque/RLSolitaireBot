@@ -75,12 +75,12 @@ namespace SolitaireAI {
 			Mat imgHsv = new Mat();
 			CvInvoke.CvtColor(img, imgHsv, ColorConversion.Bgr2Hsv);
 
-			Mat imgGray = new Mat();
-			CvInvoke.CvtColor(img, imgGray, ColorConversion.Bgr2Gray);
-			CvInvoke.Threshold(imgGray, imgGray, 240, 255, ThresholdType.Binary);
+			//Mat imgGray = new Mat();
+			//CvInvoke.CvtColor(img, imgGray, ColorConversion.Bgr2Gray);
+			//CvInvoke.Threshold(imgGray, imgGray, 240, 255, ThresholdType.Binary);
 			//m_Return = imgGray.Bitmap;
-			Matrix<byte> imgGrayMatrix = new Matrix<byte>(imgGray.Rows, imgGray.Cols, imgGray.NumberOfChannels);
-			imgGray.CopyTo(imgGrayMatrix);
+			//Matrix<byte> imgGrayMatrix = new Matrix<byte>(imgGray.Rows, imgGray.Cols, imgGray.NumberOfChannels);
+			//imgGray.CopyTo(imgGrayMatrix);
 
 			// Values for the smallest window size: Width: 624, Height: 398
 			/*const int cardWidth = 55;
@@ -111,21 +111,21 @@ namespace SolitaireAI {
 			// Waste
 			{
 				const int startX = leftOffset + (cardWidth * 2) + (cardSpacing * 2);
-				const int endX = leftOffset + (cardWidth * 2) + cardSpacing;
+				const int stopX = leftOffset + (cardWidth * 2) + cardSpacing;
 				const int centerY = topOffsetRow1 + (cardHeight / 2);
 
-				int left = 0;
-				for (int x = startX; x > endX; --x) {
-					if (imgGrayMatrix[centerY, x] == 255) {
+				int rightEdge = 0;
+				for (int x = startX; x > stopX; --x) {
+					Mat pixel = new Mat(imgHsv, new Rectangle(x, centerY, 1, 1));
+					if (IsCard(pixel)) {
 						break;
 					}
-					left = x;
-					print(x.ToString());
+					rightEdge = x;
 				}
 
-				CvInvoke.Line(img, new Point(startX, topOffsetRow1 + (cardHeight / 2)), new Point(left, topOffsetRow1 + (cardHeight / 2)), new Bgr(Color.Red).MCvScalar);
+				CvInvoke.Line(img, new Point(startX, centerY), new Point(rightEdge, centerY), new Bgr(Color.Red).MCvScalar);
 
-				var rect = new Rectangle(left - cardWidth, topOffsetRow1, cardWidth, cardHeight);
+				var rect = new Rectangle(rightEdge - cardWidth, topOffsetRow1, cardWidth, cardHeight);
 
 				Mat card = new Mat(img, rect);
 				m_State.m_CurrentCardInWaste = ParseCard(card);
@@ -136,6 +136,7 @@ namespace SolitaireAI {
 			// Foundation
 			for (int i = 0; i < m_State.m_Foundation.Length; ++i) {
 				var rect = new Rectangle(leftOffset + (cardWidth * (3 + i)) + (cardSpacing * (3 + i)), topOffsetRow1, cardWidth, cardHeight);
+
 				Mat card = new Mat(img, rect);
 				m_State.m_Foundation[i] = ParseCard(card);
 
@@ -144,20 +145,27 @@ namespace SolitaireAI {
 
 			// Tableau
 			for (int i = 0; i < m_State.m_Tableau.Length; ++i) {
-				int cardCenter = leftOffset + (cardWidth / 2) + ((cardWidth + cardSpacing) * i);
+				int startHeight = img.Height - 1;
+				int stopHeight = topOffsetRow2 + cardHeight;
+				int cardCenterX = leftOffset + (cardWidth / 2) + ((cardWidth + cardSpacing) * i);
 
-				int bottom = 0;
-				for (int y = imgGrayMatrix.Height - 1; y > topOffsetRow2 + cardHeight; --y) {
-					if (imgGrayMatrix[y, cardCenter] == 255) {
+				int bottomEdge = 0;
+				for (int y = startHeight; y > stopHeight; --y) {
+					Mat pixel = new Mat(imgHsv, new Rectangle(cardCenterX, y, 1, 1));
+					if (IsCard(pixel)) {
 						break;
 					}
-					bottom = y;
+					bottomEdge = y;
 				}
 
-				var rect = new Rectangle(cardCenter - (cardWidth / 2), bottom - cardHeight, cardWidth, cardHeight);
-				
-				//if( i == 0)
-				m_State.m_Tableau[i] = ParseCard(new Mat(img, rect));
+				CvInvoke.Line(img, new Point(cardCenterX, img.Height - 1), new Point(cardCenterX, bottomEdge), new Bgr(Color.Red).MCvScalar);
+
+
+				var rect = new Rectangle(cardCenterX - (cardWidth / 2), bottomEdge - cardHeight, cardWidth, cardHeight);
+
+				//if( i == 0) {
+				Mat card = new Mat(img, rect);
+				m_State.m_Tableau[i] = ParseCard(card);
 
 				CvInvoke.Rectangle(img, rect, new Bgr(255, 0, 0).MCvScalar);
 			}
@@ -199,7 +207,7 @@ namespace SolitaireAI {
 					}
 				}
 
-				CvInvoke.Rectangle(card, rect, new Bgr(0, 255, 0).MCvScalar);
+				CvInvoke.Rectangle(card, rect, new Bgr(Color.Green).MCvScalar);
 			}
 
 			// Get Number
@@ -220,7 +228,7 @@ namespace SolitaireAI {
 					}
 				}
 
-				CvInvoke.Rectangle(card, rect, new Bgr(0, 255, 0).MCvScalar);
+				CvInvoke.Rectangle(card, rect, new Bgr(Color.Green).MCvScalar);
 			}
 
 			return new Card() { m_Number = number, m_Suit = suit };

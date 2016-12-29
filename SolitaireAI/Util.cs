@@ -33,7 +33,7 @@ namespace SolitaireAI {
 
 		public static double GetSimilarity(Mat A, Mat B) {
 			Mat result = new Mat();
-			CvInvoke.MatchTemplate(A, B, result, TemplateMatchingType.CcorrNormed);
+			CvInvoke.MatchTemplate(A, B, result, TemplateMatchingType.CcoeffNormed);
 			double[] minValues, maxValues;
 			Point[] minLocations, maxLocations;
 			result.MinMax(out minValues, out maxValues, out minLocations, out maxLocations);

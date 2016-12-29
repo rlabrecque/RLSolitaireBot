@@ -53,8 +53,8 @@ namespace SolitaireAI {
 			if (HookManager.IsHooked(process.Id)) { return; }
 
 			CaptureConfig cc = new CaptureConfig() { Direct3DVersion = Direct3DVersion.AutoDetect, ShowOverlay = true };
-			
-			var captureInterface = new CaptureInterface();
+
+			CaptureInterface captureInterface = new CaptureInterface();
 			captureInterface.RemoteMessage += new MessageReceivedEvent(CaptureInterface_RemoteMessage);
 			m_captureProcess = new CaptureProcess(process, cc, captureInterface);
 
@@ -92,11 +92,7 @@ namespace SolitaireAI {
 				}
 			));
 		}
-
-		private void btnCapture_Click(object sender, EventArgs e) {
-			CaptureScreenshot();
-		}
-
+		
 		void CaptureScreenshot() {
 			this.Invoke(new MethodInvoker(
 				delegate () {
@@ -117,8 +113,6 @@ namespace SolitaireAI {
 
 			using (Screenshot screenshot = m_captureProcess.CaptureInterface.EndGetScreenshot(result)) {
 				try {
-					m_captureProcess.CaptureInterface.DisplayInGameText("Screenshot captured...");
-
 					if (screenshot != null && screenshot.Data != null) {
 						pictureBox1.Invoke(new MethodInvoker(
 							delegate () {
