@@ -98,7 +98,15 @@ namespace SolitaireAI {
 		}
 
 		public static Bitmap CopyToBitmap(this Mat mat) {
-				return CvInvoke.RawDataToBitmap(mat.DataPointer, mat.Step, mat.Size, typeof(Bgr), mat.NumberOfChannels, CvInvoke.GetDepthType(mat.Depth), false);
+			Type colorType;
+			switch (mat.NumberOfChannels) {
+				case 1: colorType = typeof(Gray); break;
+				case 3: colorType = typeof(Bgr);  break;
+				case 4: colorType = typeof(Bgra); break;
+				default: throw new Exception("Unknown color type");
+			}
+
+			return CvInvoke.RawDataToBitmap(mat.DataPointer, mat.Step, mat.Size, colorType, mat.NumberOfChannels, CvInvoke.GetDepthType(mat.Depth), false);
 		}
 	}
 }

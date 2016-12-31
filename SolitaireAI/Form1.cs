@@ -130,7 +130,12 @@ namespace SolitaireAI {
 								if (pictureBox1.Image != null) {
 									pictureBox1.Image.Dispose();
 								}
-								pictureBox1.Image = m_Bot.OnGameFrame(screenshot.Data,  new Size(screenshot.Width, screenshot.Height), screenshot.Stride);
+
+								Bitmap screen = m_Bot.OnGameFrame(screenshot.Data, new Size(screenshot.Width, screenshot.Height), screenshot.Stride);
+								if (screen != null) {
+									pictureBox1.Image = screen;
+								}
+
 								m_StateDisplayLabel.Text = m_Bot.GetState();
 							}
 						));
