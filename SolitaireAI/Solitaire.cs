@@ -53,7 +53,7 @@ namespace SolitaireAI {
 		public static readonly ScalarArray HsvGreenUpperBound = new ScalarArray(new MCvScalar(180, 256, 256));
 	}
 
-	public enum Action {
+	/*public enum Action {
 		Idle,
 		DoubleClick,
 	}
@@ -63,11 +63,15 @@ namespace SolitaireAI {
 		public List<Card> m_Waste;
 		public List<Card>[] m_Foundation;
 		public List<Card>[] m_Tableau;
-	}
+	}*/
 
 	public struct Card {
 		public Number m_Number;
 		public Suit m_Suit;
+
+		public override string ToString() {
+			return m_Number + " " + m_Suit;
+		}
 	}
 
 	public struct VisualState {
@@ -103,9 +107,10 @@ namespace SolitaireAI {
 		const int foundationSlots = 4;
 		const int tableauSlots = 7;
 
+		const bool m_StepThink = true;
 		Bitmap m_DebugReturn;
-		Action m_CurrentAction;
-		BoardState m_BoardState;
+		//Action m_CurrentAction;
+		//BoardState m_BoardState;
 		VisualState m_VisualState;
 		ReferenceImages m_ReferenceImages;
 
@@ -152,7 +157,7 @@ namespace SolitaireAI {
 		}
 
 		public override void OnAttach() {
-			m_BoardState.m_Stock = new List<Card>(24);
+			/*m_BoardState.m_Stock = new List<Card>(24);
 			m_BoardState.m_Waste = new List<Card>(0);
 			m_BoardState.m_Foundation = new List<Card>[foundationSlots];
 			m_BoardState.m_Tableau = new List<Card>[tableauSlots];
@@ -163,7 +168,7 @@ namespace SolitaireAI {
 
 			for (int i = 0; i < m_BoardState.m_Tableau.Length; ++i) {
 				m_BoardState.m_Tableau[i] = new List<Card>(i);
-			}
+			}*/
 
 			m_VisualState.m_Foundation = new Card[foundationSlots];
 			m_VisualState.m_Tableau = new Card[tableauSlots];
@@ -198,10 +203,6 @@ namespace SolitaireAI {
 		}
 
 		public override Bitmap OnGameFrame(byte[] data, Size size, int stride) {
-			if (m_CurrentAction != Action.Idle) {
-				return null;
-			}
-
 			using (Mat img = Util.ByteArrayToMat(data, size, stride)) {
 				// Stock
 				{
@@ -270,6 +271,8 @@ namespace SolitaireAI {
 					CvInvoke.Rectangle(img, rect, CvScalarColor.Blue);
 				}
 
+				Think();
+
 				return m_DebugReturn ?? img.CopyToBitmap();
 			}
 		}
@@ -317,49 +320,49 @@ namespace SolitaireAI {
 			}
 		}
 
+		public void Think() {
+			// First check if there's a card that we can move from the Tableau to the Foundation
+			for (int tableSlot = 0; tableSlot < tableauSlots; ++tableSlot) {
+				Card tableCard = m_VisualState.m_Tableau[tableSlot];
+				if (tableCard.m_Number == Number.UNKNOWN) { continue; }
+
+				for (int foundationSlot = 0; foundationSlot < foundationSlots; ++foundationSlot) {
+					Card foundationCard = m_VisualState.m_Foundation[foundationSlot];
+					if (foundationCard.m_Number != Number.UNKNOWN && tableCard.m_Suit != foundationCard.m_Suit) { continue; }
+					if (tableCard.m_Number != foundationCard.m_Number + 1) { continue; }
+
+					print("Move " + tableCard + " from table: " + tableSlot + " to foundation: " + foundationSlot);
+					return;
+				}
+			}
+		}
+
 		public override string GetState() {
-			StringBuilder state = new StringBuilder(250);
-			state.Append("Current Action: ");
-			state.AppendLine(m_CurrentAction.ToString());
-			state.AppendLine();
+			StringBuilder state = new StringBuilder(300);
+			//state.Append("Current Action: ");
+			//state.AppendLine(m_CurrentAction.ToString());
+			//state.AppendLine();
 			state.AppendLine("Visual State:");
+			state.AppendLine();
 			state.AppendLine("----------------");
+			state.AppendLine();
 			state.Append("Cards In Stock: ");
 			state.AppendLine(m_VisualState.m_bCardsInStock.ToString());
 
+			state.AppendLine();
 			state.Append("Card In Waste: ");
-			if (m_VisualState.m_CardInWaste.m_Number != Number.UNKNOWN) {
-				state.Append(m_VisualState.m_CardInWaste.m_Number);
-				state.Append(" ");
-				state.AppendLine(m_VisualState.m_CardInWaste.m_Suit.ToString());
-			}
-			else {
-				state.AppendLine("----");
-			}
+			state.AppendLine((m_VisualState.m_CardInWaste.m_Number != Number.UNKNOWN) ? m_VisualState.m_CardInWaste.ToString() : "----");
 
+			state.AppendLine();
 			state.AppendLine("Foundation: ");
 			foreach (Card card in m_VisualState.m_Foundation) {
-				if (card.m_Number != Number.UNKNOWN) {
-					state.Append(card.m_Number);
-					state.Append(" ");
-					state.AppendLine(card.m_Suit.ToString());
-				}
-				else {
-					state.AppendLine("----");
-				}
+				state.AppendLine((card.m_Number != Number.UNKNOWN) ? card.ToString() : "----");
 			}
 
+			state.AppendLine();
 			state.AppendLine("Tableau: ");
 			foreach (Card card in m_VisualState.m_Tableau) {
-				if (card.m_Number != Number.UNKNOWN) {
-					state.Append(card.m_Number);
-					state.Append(" ");
-					state.AppendLine(card.m_Suit.ToString());
-
-				}
-				else {
-					state.AppendLine("----");
-				}
+				state.AppendLine((card.m_Number != Number.UNKNOWN) ? card.ToString() : "----");
 			}
 
 			return state.ToString();
