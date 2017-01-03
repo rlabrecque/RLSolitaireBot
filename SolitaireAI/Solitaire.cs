@@ -8,7 +8,7 @@ using Emgu.CV.Structure;
 using Emgu.CV.Util;
 using Emgu.CV.ML;
 using Emgu.CV.ML.MlEnum;
-using System.Linq;
+using PInvoke;
 
 namespace SolitaireAI {
 	public enum Number {
@@ -68,6 +68,7 @@ namespace SolitaireAI {
 	public struct Card {
 		public Number m_Number;
 		public Suit m_Suit;
+		public Point m_Center;
 
 		public override string ToString() {
 			return m_Number + " " + m_Suit;
@@ -93,7 +94,7 @@ namespace SolitaireAI {
 
 		public string GetExecutableName { get { return "Solitaire.exe"; } }
 		public string Author { get { return "Riley Labrecque"; } }
-		public IBot GetBot { get { return new Solitaire(); } }
+		public IBot CreateBot { get { return new Solitaire(); } }
 	}
 
 	public class Solitaire : IBot {
@@ -106,8 +107,7 @@ namespace SolitaireAI {
 		const int topOffsetRow2 = 295;
 		const int foundationSlots = 4;
 		const int tableauSlots = 7;
-
-		const bool m_StepThink = true;
+		
 		Bitmap m_DebugReturn;
 		//Action m_CurrentAction;
 		//BoardState m_BoardState;
@@ -230,7 +230,7 @@ namespace SolitaireAI {
 					var rect = new Rectangle(rightEdge - cardWidth, topOffsetRow1, cardWidth, cardHeight);
 
 					using (Mat card = new Mat(img, rect)) {
-						m_VisualState.m_CardInWaste = ParseCard(card);
+						m_VisualState.m_CardInWaste = ParseCard(card, new Point(rightEdge - (cardWidth / 2), centerY));
 					}
 
 					CvInvoke.Rectangle(img, rect, CvScalarColor.Blue);
@@ -241,7 +241,7 @@ namespace SolitaireAI {
 					var rect = new Rectangle(leftOffset + (cardWidth * (3 + i)) + (cardSpacing * (3 + i)), topOffsetRow1, cardWidth, cardHeight);
 
 					using (Mat card = new Mat(img, rect)) {
-						m_VisualState.m_Foundation[i] = ParseCard(card);
+						m_VisualState.m_Foundation[i] = ParseCard(card, new Point(rect.Left + (rect.Width / 2), rect.Top + (rect.Height / 2)));
 					}
 
 					CvInvoke.Rectangle(img, rect, CvScalarColor.Blue);
@@ -265,22 +265,20 @@ namespace SolitaireAI {
 					var rect = new Rectangle(leftEdge, topEdge, cardWidth, cardHeight);
 
 					using (Mat card = new Mat(img, rect)) {
-						m_VisualState.m_Tableau[i] = ParseCard(card);
+						m_VisualState.m_Tableau[i] = ParseCard(card, new Point(cardCenterX, topEdge + (cardHeight / 2)));
 					}
 
 					CvInvoke.Rectangle(img, rect, CvScalarColor.Blue);
 				}
-
-				Think();
-
+				
 				return m_DebugReturn ?? img.CopyToBitmap();
 			}
 		}
 
-		Card ParseCard(Mat card) {
+		Card ParseCard(Mat card, Point cardCenter) {
 			// First check if a card exists at this location
 			if (!IsCard(card)) {
-				return new Card() { m_Number = Number.UNKNOWN, m_Suit = Suit.UNKNOWN };
+				return new Card() { m_Number = Number.UNKNOWN, m_Suit = Suit.UNKNOWN, m_Center = cardCenter };
 			}
 
 			// Get Suit
@@ -293,16 +291,18 @@ namespace SolitaireAI {
 			Number number = (Number)GetImageSimilarityFromKNN(m_NumbersKNN, card, rect);
 			CvInvoke.Rectangle(card, rect, CvScalarColor.Green);
 
-			return new Card() { m_Number = number, m_Suit = suit };
+			// Todo: Can we get cardCenter from the Mat?
+			return new Card() { m_Number = number, m_Suit = suit, m_Center = cardCenter };
 		}
 
 		public int GetEdgeOfCard(Mat mat) {
+			// TODO: Ugh IplImage
 			using (var img = mat.ToImage<Bgr, byte>()) {
 				for (int row = mat.Rows - 1; row >= 0; --row) {
 					for (int col = mat.Cols - 1; col >= 0; --col) {
 						var pixel = img[row, col];
 						if ((pixel.Blue >= 230 && pixel.Green >= 230 && pixel.Red >= 230)) {
-							return row + col + 2; // + 2 for the border
+							return row + col + 2; // +2px for the border, either row or col should always be 0 if you're passing in a 1 px slice
 						}
 					}
 				}
@@ -320,7 +320,7 @@ namespace SolitaireAI {
 			}
 		}
 
-		public void Think() {
+		public override void OnThink() {
 			// First check if there's a card that we can move from the Tableau to the Foundation
 			for (int tableSlot = 0; tableSlot < tableauSlots; ++tableSlot) {
 				Card tableCard = m_VisualState.m_Tableau[tableSlot];
@@ -331,10 +331,19 @@ namespace SolitaireAI {
 					if (foundationCard.m_Number != Number.UNKNOWN && tableCard.m_Suit != foundationCard.m_Suit) { continue; }
 					if (tableCard.m_Number != foundationCard.m_Number + 1) { continue; }
 
-					print("Move " + tableCard + " from table: " + tableSlot + " to foundation: " + foundationSlot);
+					print("Move " + tableCard + " from Tableau[" + tableSlot + "] to Foundation[" + foundationSlot + "]");
+					MoveCard(tableCard, foundationCard);
 					return;
 				}
 			}
+
+			print("Nothing to do...");
+		}
+
+		public void MoveCard(Card from, Card to) {
+			print("Moving " + from + " from " + from.m_Center + " to " + to.m_Center);
+			Input.SendKey(VK.F4);
+			//Input.SendMouseLButtonDown(from.m_Center);
 		}
 
 		public override string GetState() {
@@ -343,9 +352,7 @@ namespace SolitaireAI {
 			//state.AppendLine(m_CurrentAction.ToString());
 			//state.AppendLine();
 			state.AppendLine("Visual State:");
-			state.AppendLine();
 			state.AppendLine("----------------");
-			state.AppendLine();
 			state.Append("Cards In Stock: ");
 			state.AppendLine(m_VisualState.m_bCardsInStock.ToString());
 

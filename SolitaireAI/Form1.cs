@@ -8,23 +8,26 @@ using Capture.Interface;
 using Capture.Hook;
 using Capture;
 
+using PInvoke;
+
 namespace SolitaireAI {
 	public partial class Form1 : Form {
 		IBot m_Bot;
-		CaptureProcess m_captureProcess;
+		public static CaptureProcess m_captureProcess;
+		bool m_StepThisFrame = false;
 
 		public Form1() {
 			InitializeComponent();
 		}
 
 		private void Form1_Load(object sender, EventArgs e) {
-			comboBox1.Items.Add(new SolitaireInfo());
-			comboBox1.SelectedIndex = 0;
+			m_BotInfoComboBox.Items.Add(new SolitaireInfo());
+			m_BotInfoComboBox.SelectedIndex = 0;
 
 			AttachProcess();
 		}
 
-		private void btnInject_Click(object sender, EventArgs e) {
+		private void m_InjectButton_Click(object sender, EventArgs e) {
 			if (m_captureProcess == null) {
 				AttachProcess();
 			}
@@ -33,14 +36,22 @@ namespace SolitaireAI {
 			}
 		}
 		
-		private void AttachProcess() {
-			btnInject.Enabled = false;
+		private void m_SteppingEnabledCheckbox_CheckedChanged(object sender, EventArgs e) {
+			m_StepThisFrameButton.Enabled = m_SteppingEnabledCheckbox.Checked;
+		}
 
-			string exeName = Path.GetFileNameWithoutExtension(((IBotInfo)comboBox1.SelectedItem).GetExecutableName);
+		private void m_StepThisFrame_Click(object sender, EventArgs e) {
+			m_StepThisFrame = true;
+		}
+
+		private void AttachProcess() {
+			m_InjectButton.Enabled = false;
+
+			string exeName = Path.GetFileNameWithoutExtension(((IBotInfo)m_BotInfoComboBox.SelectedItem).GetExecutableName);
 			Process[] processes = Process.GetProcessesByName(exeName);
 			if (processes.Length == 0) {
 				MessageBox.Show("No executable found matching: '" + exeName + "'");
-				btnInject.Enabled = true;
+				m_InjectButton.Enabled = true;
 				return;
 			}
 			
@@ -59,37 +70,42 @@ namespace SolitaireAI {
 
 			Thread.Sleep(10);
 
-			btnInject.Text = "Detach";
-			btnInject.Enabled = true;
-
-			m_Bot = ((IBotInfo)comboBox1.SelectedItem).GetBot;
-
+			m_Bot = ((IBotInfo)m_BotInfoComboBox.SelectedItem).CreateBot;
 			m_Bot.OnAttach();
-			
-			CaptureScreenshot();
+
+			m_InjectButton.Text = "Detach";
+			m_InjectButton.Enabled = true;
+			m_SteppingEnabledCheckbox.Checked = true;
+			m_SteppingEnabledCheckbox.Enabled = true;
 
 			myTimer.Tick += new EventHandler(TimerEventProcessor);
 			myTimer.Interval = 100;
 			myTimer.Start();
+
+			CaptureScreenshot();
 		}
 
 		System.Windows.Forms.Timer myTimer = new System.Windows.Forms.Timer();
-		void TimerEventProcessor(Object myObject, EventArgs myEventArgs) {
-			const UInt32 WM_PAINT = 0x000F;
-			IntPtr dc = NativeMethods.GetDC(m_captureProcess.Process.MainWindowHandle);
-			NativeMethods.PostMessage(m_captureProcess.Process.MainWindowHandle, WM_PAINT, dc, IntPtr.Zero);
-			NativeMethods.ReleaseDC(m_captureProcess.Process.MainWindowHandle, dc);
+		unsafe void TimerEventProcessor(Object myObject, EventArgs myEventArgs) {
+			User32.SafeDCHandle dc = User32.GetDC(m_captureProcess.Process.MainWindowHandle);
+
+			User32.PostMessage(m_captureProcess.Process.MainWindowHandle, User32.WindowMessage.WM_PAINT, (void*)dc.DangerousGetHandle(), null);
 		}
 
 		private void DetachProcess() {
 			myTimer.Stop();
+
+			m_InjectButton.Text = "Inject";
+			m_InjectButton.Enabled = true;
+			m_SteppingEnabledCheckbox.Checked = false;
+			m_SteppingEnabledCheckbox.Enabled = false;
+
 			m_Bot.OnDetach();
+			m_Bot = null;
+
 			HookManager.RemoveHookedProcess(m_captureProcess.Process.Id);
 			m_captureProcess.CaptureInterface.Disconnect();
 			m_captureProcess = null;
-
-			btnInject.Text = "Inject";
-			btnInject.Enabled = true;
 		}
 
 		/*void CaptureInterface_RemoteMessage(MessageReceivedEventArgs message) {
@@ -110,6 +126,10 @@ namespace SolitaireAI {
 		}*/
 		
 		void CaptureScreenshot() {
+			if(m_captureProcess == null || m_Bot == null) {
+				return;
+			}
+
 			this.Invoke(new MethodInvoker(
 				delegate () {
 					m_captureProcess.CaptureInterface.BeginGetScreenshot(Rectangle.Empty, new TimeSpan(0, 0, 1), ScreenshotCallback, null, format: ImageFormat.PixelData);
@@ -118,22 +138,27 @@ namespace SolitaireAI {
 		}
 
 		void ScreenshotCallback(IAsyncResult result) {
-			if (m_captureProcess == null) {
+			if (m_captureProcess == null || m_Bot == null) {
 				return;
 			}
 
 			using (Screenshot screenshot = m_captureProcess.CaptureInterface.EndGetScreenshot(result)) {
 				try {
 					if (screenshot != null && screenshot.Data != null) {
-						pictureBox1.Invoke(new MethodInvoker(
+						m_DebugVisualizer.Invoke(new MethodInvoker(
 							delegate () {
-								if (pictureBox1.Image != null) {
-									pictureBox1.Image.Dispose();
+								if (m_DebugVisualizer.Image != null) {
+									m_DebugVisualizer.Image.Dispose();
 								}
 
 								Bitmap screen = m_Bot.OnGameFrame(screenshot.Data, new Size(screenshot.Width, screenshot.Height), screenshot.Stride);
 								if (screen != null) {
-									pictureBox1.Image = screen;
+									m_DebugVisualizer.Image = screen;
+								}
+
+								if (!m_SteppingEnabledCheckbox.Checked || m_StepThisFrame) {
+									m_Bot.OnThink();
+									m_StepThisFrame = false;
 								}
 
 								m_StateDisplayLabel.Text = m_Bot.GetState();
@@ -147,6 +172,18 @@ namespace SolitaireAI {
 				catch {
 				}
 			}
+		}
+
+		protected override bool ProcessCmdKey(ref Message msg, Keys keyData) {
+			if (keyData == Keys.Escape) {
+				Close();
+				return true;
+			}
+			else if(keyData == Keys.F4) {
+				System.Diagnostics.Debug.WriteLine("F4 PRESEDE IN MAIN WINDOW");
+			}
+
+			return base.ProcessCmdKey(ref msg, keyData);
 		}
 	}
 }
