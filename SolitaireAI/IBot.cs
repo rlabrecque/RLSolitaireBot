@@ -17,9 +17,10 @@ namespace SolitaireAI {
 
 		public abstract string GetState();
 		
-		public void print(string message) {
+		public static void print(string message) {
 			//System.Console.WriteLine(message);
 			System.Diagnostics.Debug.WriteLine(message);
+			Form1.Instance.AddToListbox(message);
 		}
 	}
 }

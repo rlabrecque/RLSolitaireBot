@@ -30,6 +30,7 @@
 			this.m_BotInfoComboBox = new System.Windows.Forms.ComboBox();
 			this.m_SteppingEnabledCheckbox = new System.Windows.Forms.CheckBox();
 			this.m_StepThisFrameButton = new System.Windows.Forms.Button();
+			this.m_LogListBox = new System.Windows.Forms.ListBox();
 			((System.ComponentModel.ISupportInitialize)(this.m_DebugVisualizer)).BeginInit();
 			this.SuspendLayout();
 			// 
@@ -50,7 +51,7 @@
             | System.Windows.Forms.AnchorStyles.Right)));
 			this.m_DebugVisualizer.Location = new System.Drawing.Point(139, 12);
 			this.m_DebugVisualizer.Name = "m_DebugVisualizer";
-			this.m_DebugVisualizer.Size = new System.Drawing.Size(680, 497);
+			this.m_DebugVisualizer.Size = new System.Drawing.Size(1493, 601);
 			this.m_DebugVisualizer.TabIndex = 2;
 			this.m_DebugVisualizer.TabStop = false;
 			// 
@@ -103,11 +104,23 @@
 			this.m_StepThisFrameButton.UseVisualStyleBackColor = true;
 			this.m_StepThisFrameButton.Click += new System.EventHandler(this.m_StepThisFrame_Click);
 			// 
+			// m_LogListBox
+			// 
+			this.m_LogListBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+			this.m_LogListBox.FormattingEnabled = true;
+			this.m_LogListBox.Location = new System.Drawing.Point(139, 619);
+			this.m_LogListBox.Name = "m_LogListBox";
+			this.m_LogListBox.ScrollAlwaysVisible = true;
+			this.m_LogListBox.Size = new System.Drawing.Size(1493, 108);
+			this.m_LogListBox.TabIndex = 23;
+			// 
 			// Form1
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-			this.ClientSize = new System.Drawing.Size(831, 521);
+			this.ClientSize = new System.Drawing.Size(1644, 737);
+			this.Controls.Add(this.m_LogListBox);
 			this.Controls.Add(this.m_StepThisFrameButton);
 			this.Controls.Add(this.m_SteppingEnabledCheckbox);
 			this.Controls.Add(this.m_BotInfoComboBox);
@@ -133,6 +146,7 @@
 		private System.Windows.Forms.ComboBox m_BotInfoComboBox;
 		private System.Windows.Forms.CheckBox m_SteppingEnabledCheckbox;
 		private System.Windows.Forms.Button m_StepThisFrameButton;
+		private System.Windows.Forms.ListBox m_LogListBox;
 	}
 }
 

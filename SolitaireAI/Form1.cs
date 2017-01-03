@@ -12,15 +12,19 @@ using PInvoke;
 
 namespace SolitaireAI {
 	public partial class Form1 : Form {
+		public static Form1 Instance { get; private set; }
+
 		IBot m_Bot;
 		public static CaptureProcess m_captureProcess;
 		bool m_StepThisFrame = false;
 
 		public Form1() {
 			InitializeComponent();
+			Instance = this;
 		}
 
 		private void Form1_Load(object sender, EventArgs e) {
+			//m_BotInfoComboBox.Items.Add(new InputTestInfo());
 			m_BotInfoComboBox.Items.Add(new SolitaireInfo());
 			m_BotInfoComboBox.SelectedIndex = 0;
 
@@ -70,6 +74,7 @@ namespace SolitaireAI {
 
 			Thread.Sleep(10);
 
+			IBot.print("Creating and attaching script: " + ((IBotInfo)m_BotInfoComboBox.SelectedItem).ToString() + " by " + ((IBotInfo)m_BotInfoComboBox.SelectedItem).Author);
 			m_Bot = ((IBotInfo)m_BotInfoComboBox.SelectedItem).CreateBot;
 			m_Bot.OnAttach();
 
@@ -88,7 +93,6 @@ namespace SolitaireAI {
 		System.Windows.Forms.Timer myTimer = new System.Windows.Forms.Timer();
 		unsafe void TimerEventProcessor(Object myObject, EventArgs myEventArgs) {
 			User32.SafeDCHandle dc = User32.GetDC(m_captureProcess.Process.MainWindowHandle);
-
 			User32.PostMessage(m_captureProcess.Process.MainWindowHandle, User32.WindowMessage.WM_PAINT, (void*)dc.DangerousGetHandle(), null);
 		}
 
@@ -100,12 +104,15 @@ namespace SolitaireAI {
 			m_SteppingEnabledCheckbox.Checked = false;
 			m_SteppingEnabledCheckbox.Enabled = false;
 
+			IBot.print("Unloading script");
 			m_Bot.OnDetach();
 			m_Bot = null;
 
 			HookManager.RemoveHookedProcess(m_captureProcess.Process.Id);
 			m_captureProcess.CaptureInterface.Disconnect();
 			m_captureProcess = null;
+
+			m_DebugVisualizer.Image = null;
 		}
 
 		/*void CaptureInterface_RemoteMessage(MessageReceivedEventArgs message) {
@@ -174,13 +181,30 @@ namespace SolitaireAI {
 			}
 		}
 
+		delegate void UpdateLogListBoxDelegate(string msg);
+		public void AddToListbox(string msg) {
+			// Check whether the caller must call an invoke method when making method calls to listBoxCCNetOutput because the caller is 
+			// on a different thread than the one the listBoxCCNetOutput control was created on.
+			if (m_LogListBox.InvokeRequired) {
+				UpdateLogListBoxDelegate update = new UpdateLogListBoxDelegate(AddToListbox);
+				m_LogListBox.Invoke(update, msg);
+			}
+			else {
+				m_LogListBox.Items.Add(msg);
+
+				// Make sure the last item is made visible
+				m_LogListBox.SelectedIndex = m_LogListBox.Items.Count - 1;
+				m_LogListBox.ClearSelected();
+			}
+		}
+
 		protected override bool ProcessCmdKey(ref Message msg, Keys keyData) {
 			if (keyData == Keys.Escape) {
 				Close();
 				return true;
 			}
-			else if(keyData == Keys.F4) {
-				System.Diagnostics.Debug.WriteLine("F4 PRESEDE IN MAIN WINDOW");
+			else if(keyData == Keys.F5) {
+				System.Diagnostics.Debug.WriteLine("F5 PRESSED IN MAIN WINDOW");
 			}
 
 			return base.ProcessCmdKey(ref msg, keyData);

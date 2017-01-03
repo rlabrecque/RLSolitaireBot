@@ -322,28 +322,112 @@ namespace SolitaireAI {
 
 		public override void OnThink() {
 			// First check if there's a card that we can move from the Tableau to the Foundation
-			for (int tableSlot = 0; tableSlot < tableauSlots; ++tableSlot) {
+			//for (int tableSlot = 0; tableSlot < tableauSlots; ++tableSlot) {
+			for (int tableSlot = tableauSlots - 1; tableSlot >= 0; --tableSlot) {
 				Card tableCard = m_VisualState.m_Tableau[tableSlot];
 				if (tableCard.m_Number == Number.UNKNOWN) { continue; }
 
 				for (int foundationSlot = 0; foundationSlot < foundationSlots; ++foundationSlot) {
 					Card foundationCard = m_VisualState.m_Foundation[foundationSlot];
-					if (foundationCard.m_Number != Number.UNKNOWN && tableCard.m_Suit != foundationCard.m_Suit) { continue; }
+					//if (foundationCard.m_Number != Number.UNKNOWN) { continue; }
 					if (tableCard.m_Number != foundationCard.m_Number + 1) { continue; }
+					if (foundationCard.m_Suit != Suit.UNKNOWN && tableCard.m_Suit != foundationCard.m_Suit) { continue; }
 
-					print("Move " + tableCard + " from Tableau[" + tableSlot + "] to Foundation[" + foundationSlot + "]");
+					print("Move Tableau[" + tableCard + "] to Foundation[" + foundationCard + "]");
 					MoveCard(tableCard, foundationCard);
 					return;
 				}
 			}
 
-			print("Nothing to do...");
+
+			// Next check if there's a card that we can move from the Tableu elsewhere on the Tableu
+			//for (int tableSlot = 0; tableSlot < tableauSlots; ++tableSlot) {
+			for (int tableSlot = tableauSlots - 1; tableSlot >= 0; --tableSlot) {
+				Card tableCard = m_VisualState.m_Tableau[tableSlot];
+				if (tableCard.m_Number == Number.UNKNOWN) { continue; }
+				for (int potentialTableSlot = 0; potentialTableSlot < tableauSlots; ++potentialTableSlot) {
+					if (tableSlot == potentialTableSlot) { continue; }
+
+					Card nextTableCard = m_VisualState.m_Tableau[potentialTableSlot];
+
+					// Check if the new space is empty, and then see if this is a king that we can move there.
+					// TODO: This will just swap kings back and forth if there's empty spots until we know about cards that are locked face down.
+					if (nextTableCard.m_Number == Number.UNKNOWN) {
+						if (tableCard.m_Number == Number.King) {
+							print("Move Tableau[" + tableCard + "] to Tableau[" + nextTableCard + "]");
+							MoveCard(tableCard, nextTableCard);
+							return;
+						}
+
+						continue;
+					}
+
+					if (tableCard.m_Number != nextTableCard.m_Number - 1) { continue; }
+					if (IsSameColor(tableCard, nextTableCard)) { continue; }
+
+					print("Move Tableau[" + tableCard + "] to Tableu [" + nextTableCard + "]");
+					MoveCard(tableCard, nextTableCard);
+					return;
+				}
+			}
+
+			// Then see if we can move the card from the waste somewhere
+			if (m_VisualState.m_CardInWaste.m_Number != Number.UNKNOWN) {
+				for (int foundationSlot = 0; foundationSlot < foundationSlots; ++foundationSlot) {
+					Card foundationCard = m_VisualState.m_Foundation[foundationSlot];
+					//if (foundationCard.m_Number != Number.UNKNOWN) { continue; }
+					if (m_VisualState.m_CardInWaste.m_Number != foundationCard.m_Number + 1) { continue; }
+					if (foundationCard.m_Suit != Suit.UNKNOWN && m_VisualState.m_CardInWaste.m_Suit != foundationCard.m_Suit) { continue; }
+
+					print("Move " + m_VisualState.m_CardInWaste + " from the Waste to Foundation[" + foundationSlot + "]");
+					MoveCard(m_VisualState.m_CardInWaste, foundationCard);
+					return;
+				}
+
+				for (int potentialTableSlot = 0; potentialTableSlot < tableauSlots; ++potentialTableSlot) {
+					Card nextTableCard = m_VisualState.m_Tableau[potentialTableSlot];
+
+					// Check if the new space is empty, and then see if this is a king that we can move there.
+					// TODO: This will just swap kings back and forth if there's empty spots until we know about cards that are locked face down.
+					if (nextTableCard.m_Number == Number.UNKNOWN) {
+						if (m_VisualState.m_CardInWaste.m_Number == Number.King) {
+							print("Move " + m_VisualState.m_CardInWaste + " from the Waste to Tableau[" + nextTableCard + "]");
+							MoveCard(m_VisualState.m_CardInWaste, nextTableCard);
+							return;
+						}
+
+						continue;
+					}
+
+					if (m_VisualState.m_CardInWaste.m_Number != nextTableCard.m_Number - 1) { continue; }
+					if (IsSameColor(m_VisualState.m_CardInWaste, nextTableCard)) { continue; }
+
+					print("Move " + m_VisualState.m_CardInWaste + " from the Waste to Tableau[" + nextTableCard + "]");
+					MoveCard(m_VisualState.m_CardInWaste, nextTableCard);
+					return;
+				}
+			}
+
+			// Finally hit the deck
+			print("Flip a card from the deck");
+			Input.SendMouseLButtonDown(new Point(leftOffset + (cardWidth / 2), topOffsetRow1 + (cardHeight / 2)));
+			System.Threading.Thread.Sleep(666);
+			return;
+		}
+
+		public bool IsSameColor(Card a, Card b) {
+			return ((a.m_Suit == Suit.Diamond || a.m_Suit == Suit.Heart) &&
+					(b.m_Suit == Suit.Diamond || b.m_Suit == Suit.Heart)) ||
+					((a.m_Suit == Suit.Club || a.m_Suit == Suit.Spade) &&
+					(b.m_Suit == Suit.Club || b.m_Suit == Suit.Spade));
 		}
 
 		public void MoveCard(Card from, Card to) {
-			print("Moving " + from + " from " + from.m_Center + " to " + to.m_Center);
-			Input.SendKey(VK.F4);
-			//Input.SendMouseLButtonDown(from.m_Center);
+			//print("Moving " + from + " from " + from.m_Center + " to " + to.m_Center);
+			Input.SendMouseLButtonDown(from.m_Center);
+			System.Threading.Thread.Sleep(666);
+			Input.SendMouseLButtonDown(to.m_Center);
+			System.Threading.Thread.Sleep(666);
 		}
 
 		public override string GetState() {

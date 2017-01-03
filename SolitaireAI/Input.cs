@@ -1,65 +1,161 @@
 ﻿using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
+using PInvoke;
 using static PInvoke.User32;
+
 namespace SolitaireAI {
 	public static class Input {
+		public static void SendKey(VK key) {
+			SetForegroundWindow(Form1.m_captureProcess.Process.MainWindowHandle);
 
-		unsafe public static void SendKey(VK key) {
-			//SetForegroundWindow(Form1.m_captureProcess.Process.MainWindowHandle);
-			/*PostMessage(Form1.m_captureProcess.Process.MainWindowHandle, WindowMessage.WM_KEYDOWN, (void*)(ushort)key, null);
-			PostMessage(Form1.m_captureProcess.Process.MainWindowHandle, WindowMessage.WM_KEYUP, (void*)(ushort)key, null);*/
-			INPUT[] input = new INPUT[] {
-				new INPUT() {
+			INPUT2[] input = new INPUT2[] {
+				new INPUT2() {
 					type = InputType.INPUT_KEYBOARD,
 					ki = new KEYBDINPUT {
-						wVk = (VirtualKey)key,
-						wScan = 0,
-						dwFlags = 0,
+						wVk = 0,
+						wScan = ScanCode.F5,
+						dwFlags = KEYEVENTF.KEYEVENTF_SCANCODE,
+						dwExtraInfo = null,
+						time = 0
+					}
+				},
+				new INPUT2() {
+					type = InputType.INPUT_KEYBOARD,
+					ki = new KEYBDINPUT {
+						wVk = 0,
+						wScan = ScanCode.F5,
+						dwFlags = KEYEVENTF.KEYEVENTF_SCANCODE | KEYEVENTF.KEYEVENTF_KEYUP,
 						dwExtraInfo = null,
 						time = 0
 					}
 				}
 			};
 
-			SendInput(1, input, Marshal.SizeOf(typeof(INPUT)));
+			SendInput(input.Length, input, Marshal.SizeOf(typeof(INPUT)));
 		}
 
-		unsafe public static void SendKeyDown(VK key) {
-			PostMessage(Form1.m_captureProcess.Process.MainWindowHandle, WindowMessage.WM_KEYDOWN, (void*)(ushort)key, null);
+		public static void SendKeyDown(VK key) {
+			SetForegroundWindow(Form1.m_captureProcess.Process.MainWindowHandle);
+
+			INPUT2[] input = new INPUT2[] {
+				new INPUT2() {
+					type = InputType.INPUT_KEYBOARD,
+					ki = new KEYBDINPUT {
+						wVk = 0,
+						wScan = ScanCode.F5,
+						dwFlags = KEYEVENTF.KEYEVENTF_SCANCODE,
+						dwExtraInfo = null,
+						time = 0
+					}
+				}
+			};
+
+			SendInput(input.Length, input, Marshal.SizeOf(typeof(INPUT)));
 		}
 		
-		unsafe public static void SendKeyUp(VK key) {
-			PostMessage(Form1.m_captureProcess.Process.MainWindowHandle, WindowMessage.WM_KEYUP, (void*)(ushort)key, null);
-		}
-
-
-		unsafe public static void SendMouseLButtonDown(Point pos) {
+		public static void SendKeyUp(VK key) {
 			SetForegroundWindow(Form1.m_captureProcess.Process.MainWindowHandle);
-			INPUT input = new INPUT();
-			input.type = InputType.INPUT_MOUSE;
-			input.mi.dx = 2222;
-			input.mi.dy = 22;
-			input.mi.dwFlags = (MOUSEEVENTF.MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF.MOUSEEVENTF_MOVE | MOUSEEVENTF.MOUSEEVENTF_RIGHTDOWN | MOUSEEVENTF.MOUSEEVENTF_RIGHTUP);
-			input.mi.mouseData = 0;
-			input.mi.dwExtraInfo = null;
-			input.mi.time = 0;
-			SendInput(1, &input, sizeof(INPUT));
 
-			//PostMessage(Form1.m_captureProcess.Process.MainWindowHandle, WindowMessage.WM_SETFOCUS, GetForegroundWindow().ToPointer(), (void*)0);
-			/*uint lparam = 0;
-			lparam = 256 << 15;
-			lparam |= 128;
-			PostMessage(Form1.m_captureProcess.Process.MainWindowHandle, WindowMessage.WM_LBUTTONDOWN, (void*)0, (void*)lparam);
-			PostMessage(Form1.m_captureProcess.Process.MainWindowHandle, WindowMessage.WM_LBUTTONUP, (void*)0, (void*)lparam);*/
+			INPUT2[] input = new INPUT2[] {
+				new INPUT2() {
+					type = InputType.INPUT_KEYBOARD,
+					ki = new KEYBDINPUT {
+						wVk = 0,
+						wScan = ScanCode.F5,
+						dwFlags = KEYEVENTF.KEYEVENTF_SCANCODE | KEYEVENTF.KEYEVENTF_KEYUP,
+						dwExtraInfo = null,
+						time = 0
+					}
+				}
+			};
 
+			SendInput(input.Length, input, Marshal.SizeOf(typeof(INPUT)));
+		}
+		
+		public static void SendMouseLButtonDown(Point pos) {
+			Point AbsolutePos = GetAbsPos(pos);
+
+			SetForegroundWindow(Form1.m_captureProcess.Process.MainWindowHandle);
+			
+			INPUT2[] input = new INPUT2[] {
+				new INPUT2() {
+					type = InputType.INPUT_MOUSE,
+					mi = new MOUSEINPUT {
+						dx = AbsolutePos.X,
+						dy = AbsolutePos.Y,
+						dwFlags = (MOUSEEVENTF.MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF.MOUSEEVENTF_VIRTUALDESK | MOUSEEVENTF.MOUSEEVENTF_MOVE | MOUSEEVENTF.MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF.MOUSEEVENTF_LEFTUP),
+						mouseData = 0,
+						dwExtraInfo = null,
+						time = 0
+					}
+				}
+			};
+
+			SendInput(input.Length, input, Marshal.SizeOf(typeof(INPUT)));
+		}
+		
+		public static Point GetAbsPos(Point pos) {
+			WINDOWINFO info = new WINDOWINFO();
+
+			// TODO This was broken?!?!
+			//GetWindowInfo(Form1.m_captureProcess.Process.MainWindowHandle, ref info);
+			info.rcClient.left = 1920;
+			info.rcClient.top = 43;
+			
+			int x = info.rcClient.left + pos.X;
+			int y = info.rcClient.top + pos.Y;
+
+			int screenWidth = GetSystemMetrics(SystemMetric.SM_CXVIRTUALSCREEN);
+			int screenHeight = GetSystemMetrics(SystemMetric.SM_CYVIRTUALSCREEN);
+
+			int XSCALEFACTOR = 65535 / (screenWidth - 1);
+			int YSCALEFACTOR = 65535 / (screenHeight - 1);
+
+			int nx = x * XSCALEFACTOR;
+			int ny = y * YSCALEFACTOR;
+
+			/*Console.WriteLine("pos.X: " + pos.X + " pos.Y " + pos.Y);
+			Console.WriteLine("info.rcClient.left:" + info.rcClient.left + " info.rcClient.top: " + info.rcClient.top);
+			Console.WriteLine("x: " + x + " y: " + y);
+			Console.WriteLine("screenWidth: " + screenWidth + " screenHeight: " + screenHeight);
+			Console.WriteLine("XSCALEFACTOR: " + XSCALEFACTOR + " YSCALEFACTOR: " + YSCALEFACTOR);
+			Console.WriteLine("nx: " + nx + " ny: " + ny);*/
+
+			return new Point(nx, ny);
 		}
 
-		unsafe public static void SendMousePos(Point pos) {
 
-			//PostMessage(Form1.m_captureProcess.Process.MainWindowHandle, WindowMessage.WM_MOUSEMOVE, (void*)0, (void*)0);
-		}
+
+		[DllImport("user32.dll", SetLastError = true)]
+		public static extern uint SendInput(int nInputs, [In] INPUT2[] pInputs, int cbSize);
 	}
+
+	[Flags]
+	public enum FriendlyFlags {
+		Array = 0x1,
+		In = 0x2,
+		Out = 0x4,
+		Optional = 0x8,
+		Bidirectional = In | Out,
+	}
+
+
+	[StructLayout(LayoutKind.Explicit)]
+	public struct INPUT2 {
+		[FieldOffset(0)]
+		public InputType type;
+		
+		[FieldOffset(8)]
+		public MOUSEINPUT mi;
+		
+		[FieldOffset(8)]
+		public KEYBDINPUT ki;
+		
+		[FieldOffset(8)]
+		public HARDWAREINPUT hi;
+	}
+
 	public enum VK : ushort {
 		NO_KEY = 0,
 		LBUTTON = 1,
