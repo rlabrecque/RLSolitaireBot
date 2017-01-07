@@ -12,7 +12,8 @@ using PInvoke;
 
 namespace SolitaireAI {
 	public enum Number {
-		UNKNOWN = -1,
+		LOCKED = -2,
+		NONE = -1,
 
 		A,
 		Two,
@@ -32,7 +33,8 @@ namespace SolitaireAI {
 	}
 
 	public enum Suit {
-		UNKNOWN = -1,
+		LOCKED = -2,
+		NONE = -1,
 
 		Diamond = 0, // Red
 		Heart,       // Red
@@ -79,12 +81,13 @@ namespace SolitaireAI {
 		public bool m_bCardsInStock;
 		public Card m_CardInWaste;
 		public Card[] m_Foundation;
-		public Card[] m_Tableau;
+		public List<Card>[] m_Tableau;
 	}
 
 	public struct ReferenceImages {
 		public Mat[] m_Numbers;
 		public Mat[] m_Suits;
+		public Mat m_Locked;
 	}
 	
 	public class SolitaireInfo : IBotInfo {
@@ -107,7 +110,8 @@ namespace SolitaireAI {
 		const int topOffsetRow2 = 295;
 		const int foundationSlots = 4;
 		const int tableauSlots = 7;
-		
+
+		Mat m_DebugImg;
 		Bitmap m_DebugReturn;
 		//Action m_CurrentAction;
 		//BoardState m_BoardState;
@@ -145,10 +149,9 @@ namespace SolitaireAI {
 		public int GetImageSimilarityFromKNN(KNearest knn, Mat sample, Rectangle roi) {
 			using (Mat sample2 = new Mat(sample, roi)) {
 				CvInvoke.CvtColor(sample2, sample2, ColorConversion.Bgr2Gray);
-				CvInvoke.Threshold(sample2, sample2, 200, 255, ThresholdType.Binary);
-				CvInvoke.GaussianBlur(sample2, sample2, new Size(3, 3), 0);
+				CvInvoke.Threshold(sample2, sample2, 225, 255, ThresholdType.Binary);
 				sample2.ConvertTo(sample2, DepthType.Cv32F);
-				//gray.CopyToBitmap().Save("ReferenceImages/_.bmp");
+				//sample2.CopyToBitmap().Save("ReferenceImages/Suits/_.bmp");
 
 				using (Mat sample3 = sample2.Reshape(0, 1)) {
 					return (int)knn.Predict(sample3); //knn.FindNearest(sample, K, results, null, neighborResponses, null);
@@ -171,8 +174,12 @@ namespace SolitaireAI {
 			}*/
 
 			m_VisualState.m_Foundation = new Card[foundationSlots];
-			m_VisualState.m_Tableau = new Card[tableauSlots];
+			m_VisualState.m_Tableau = new List<Card>[tableauSlots];
+			for(int i = 0; i < tableauSlots; ++i) {
+				m_VisualState.m_Tableau[i] = new List<Card>();
+			}
 
+			m_ReferenceImages.m_Locked = CvInvoke.Imread("ReferenceImages/Locked.bmp");
 			m_ReferenceImages.m_Numbers = new Mat[(int)Number.TOTAL];
 			m_ReferenceImages.m_Suits = new Mat[(int)Suit.TOTAL];
 
@@ -188,6 +195,8 @@ namespace SolitaireAI {
 
 			m_NumbersKNN = CreateAndTrainKNN(m_ReferenceImages.m_Numbers);
 			m_SuitsKNN = CreateAndTrainKNN(m_ReferenceImages.m_Suits);
+
+
 		}
 
 		public override void OnDetach() {
@@ -203,16 +212,14 @@ namespace SolitaireAI {
 		}
 
 		public override Bitmap OnGameFrame(byte[] data, Size size, int stride) {
-			using (Mat img = Util.ByteArrayToMat(data, size, stride)) {
+			using (Mat img = Util.ByteArrayToMat(data, size, stride))
+			using (m_DebugImg = new Mat()) {
+				img.CopyTo(m_DebugImg);
 				// Stock
 				{
 					var rect = new Rectangle(leftOffset, topOffsetRow1, cardWidth, cardHeight);
-
-					using (Mat roi = new Mat(img, rect)) {
-						m_VisualState.m_bCardsInStock = IsCard(roi);
-					}
-
-					CvInvoke.Rectangle(img, rect, CvScalarColor.Blue);
+					m_VisualState.m_bCardsInStock = IsCard(img, rect);
+					CvInvoke.Rectangle(m_DebugImg, rect, CvScalarColor.Blue);
 				}
 
 				// Waste
@@ -222,99 +229,130 @@ namespace SolitaireAI {
 					
 					int rightEdge = stopX;
 					using (Mat slice = new Mat(img, new Rectangle(stopX, centerY, cardSpacing, 1))) {
-						rightEdge += GetEdgeOfCard(slice);
+						rightEdge += GetEdgeOfCardFromOutside(slice);
 					}
 
-					CvInvoke.Line(img, new Point(rightEdge, centerY), new Point(stopX + cardSpacing, centerY), CvScalarColor.Red);
+					CvInvoke.Line(m_DebugImg, new Point(rightEdge, centerY), new Point(stopX + cardSpacing, centerY), CvScalarColor.Red);
 
 					var rect = new Rectangle(rightEdge - cardWidth, topOffsetRow1, cardWidth, cardHeight);
-
-					using (Mat card = new Mat(img, rect)) {
-						m_VisualState.m_CardInWaste = ParseCard(card, new Point(rightEdge - (cardWidth / 2), centerY));
-					}
-
-					CvInvoke.Rectangle(img, rect, CvScalarColor.Blue);
+					m_VisualState.m_CardInWaste = ParseCard(img, rect);
 				}
 
 				// Foundation
 				for (int i = 0; i < foundationSlots; ++i) {
 					var rect = new Rectangle(leftOffset + (cardWidth * (3 + i)) + (cardSpacing * (3 + i)), topOffsetRow1, cardWidth, cardHeight);
-
-					using (Mat card = new Mat(img, rect)) {
-						m_VisualState.m_Foundation[i] = ParseCard(card, new Point(rect.Left + (rect.Width / 2), rect.Top + (rect.Height / 2)));
-					}
-
-					CvInvoke.Rectangle(img, rect, CvScalarColor.Blue);
+					m_VisualState.m_Foundation[i] = ParseCard(img, rect);
 				}
 
 				// Tableau
 				for (int i = 0; i < tableauSlots; ++i) {
-					int stopY = topOffsetRow2 + cardHeight;
-					int numPixelsY = img.Height - stopY - 1;
-					int cardCenterX = leftOffset + (cardWidth / 2) + ((cardWidth + cardSpacing) * i);
+					m_VisualState.m_Tableau[i].Clear();
 
-					int bottomEdge = stopY;
-					using (Mat slice = new Mat(img, new Rectangle(cardCenterX, stopY, 1, numPixelsY))) {
-						bottomEdge += GetEdgeOfCard(slice);
+					Rectangle cardPos = new Rectangle(leftOffset + ((cardWidth + cardSpacing) * i), topOffsetRow2, cardWidth, cardHeight);
+					if(i > 2) {
+						cardPos.X += 1; // :(
 					}
 
-					CvInvoke.Line(img, new Point(cardCenterX, bottomEdge), new Point(cardCenterX, stopY + numPixelsY), CvScalarColor.Red);
+					while (true) {
+						if (!IsCard(img, cardPos)) {
+							CvInvoke.Rectangle(m_DebugImg, cardPos, CvScalarColor.Red);
+							// Ugly hack :(
+							if (m_VisualState.m_Tableau[i].Count == 0) {
+								m_VisualState.m_Tableau[i].Add(new Card() { m_Number = Number.NONE, m_Suit = Suit.NONE, m_Center = cardPos.GetCenter() });
+							}
+							break;
+						}
 
-					int leftEdge = cardCenterX - (cardWidth / 2);
-					int topEdge = bottomEdge - cardHeight;
-					var rect = new Rectangle(leftEdge, topEdge, cardWidth, cardHeight);
+						Rectangle lockRect = new Rectangle(cardPos.X, cardPos.Y, cardWidth, 14);
+						using (Mat locked = new Mat(img, lockRect)) {
+							var similarityPercent = Util.GetSimilarity(m_ReferenceImages.m_Locked, locked);
+							if (similarityPercent > 0.9) {
+								CvInvoke.Rectangle(m_DebugImg, lockRect, CvScalarColor.Blue);
+								
+								m_VisualState.m_Tableau[i].Add(new Card() { m_Number = Number.LOCKED, m_Suit = Suit.LOCKED, m_Center = lockRect.GetCenter() });
 
-					using (Mat card = new Mat(img, rect)) {
-						m_VisualState.m_Tableau[i] = ParseCard(card, new Point(cardCenterX, topEdge + (cardHeight / 2)));
+								cardPos.Y += lockRect.Height;
+								continue;
+							}
+						}
+
+						Rectangle sliceRect = new Rectangle(cardPos.Right - 10, cardPos.Top + 1, 1, cardHeight / 2);
+						using (Mat slice = new Mat(img, sliceRect)) {
+							cardPos.Height = GetEdgeOfCardFromInside(slice);
+							CvInvoke.Line(m_DebugImg, new Point(sliceRect.Left, sliceRect.Top), new Point(sliceRect.Left, sliceRect.Bottom), CvScalarColor.Red);
+						}
+						
+						Card card = ParseCard(img, cardPos);
+						m_VisualState.m_Tableau[i].Add(card);
+						
+						if (img.Height - cardPos.Bottom < cardHeight) {
+							break;
+						}
+						
+						cardPos.Y += cardPos.Height;
+						cardPos.Height = cardHeight;
 					}
-
-					CvInvoke.Rectangle(img, rect, CvScalarColor.Blue);
 				}
-				
-				return m_DebugReturn ?? img.CopyToBitmap();
+
+				return m_DebugReturn ?? m_DebugImg.CopyToBitmap();
 			}
 		}
-
-		Card ParseCard(Mat card, Point cardCenter) {
+		
+		Card ParseCard(Mat img, Rectangle cardPos) {
 			// First check if a card exists at this location
-			if (!IsCard(card)) {
-				return new Card() { m_Number = Number.UNKNOWN, m_Suit = Suit.UNKNOWN, m_Center = cardCenter };
+			if (!IsCard(img, cardPos)) {
+				CvInvoke.Rectangle(m_DebugImg, cardPos, CvScalarColor.Red);
+				return new Card() { m_Number = Number.NONE, m_Suit = Suit.NONE, m_Center = cardPos.GetCenter() };
 			}
+
+			CvInvoke.Rectangle(m_DebugImg, cardPos, CvScalarColor.Blue);
 
 			// Get Suit
-			Rectangle rect = new Rectangle(4, 31, 22, 26);
-			Suit suit = (Suit)GetImageSimilarityFromKNN(m_SuitsKNN, card, rect);
-			CvInvoke.Rectangle(card, rect, CvScalarColor.Green);
+			Rectangle rect = new Rectangle(cardPos.X + 6, cardPos.Y + 32, 20, 10);
+			Suit suit = (Suit)GetImageSimilarityFromKNN(m_SuitsKNN, img, rect);
+			CvInvoke.Rectangle(m_DebugImg, rect, CvScalarColor.Green);
 
 			// Get Number
-			rect = new Rectangle(3, 3, 27, 27);
-			Number number = (Number)GetImageSimilarityFromKNN(m_NumbersKNN, card, rect);
-			CvInvoke.Rectangle(card, rect, CvScalarColor.Green);
+			rect = new Rectangle(cardPos.X + 6, cardPos.Y + 6, 24, 24);
+			Number number = (Number)GetImageSimilarityFromKNN(m_NumbersKNN, img, rect);
+			CvInvoke.Rectangle(m_DebugImg, rect, CvScalarColor.Green);
 
-			// Todo: Can we get cardCenter from the Mat?
-			return new Card() { m_Number = number, m_Suit = suit, m_Center = cardCenter };
+			return new Card() { m_Number = number, m_Suit = suit, m_Center = cardPos.GetCenter() };
 		}
 
-		public int GetEdgeOfCard(Mat mat) {
+		public int GetEdgeOfCardFromInside(Mat mat) {
 			// TODO: Ugh IplImage
 			using (var img = mat.ToImage<Bgr, byte>()) {
-				for (int row = mat.Rows - 1; row >= 0; --row) {
-					for (int col = mat.Cols - 1; col >= 0; --col) {
-						var pixel = img[row, col];
-						if ((pixel.Blue >= 230 && pixel.Green >= 230 && pixel.Red >= 230)) {
-							return row + col + 2; // +2px for the border, either row or col should always be 0 if you're passing in a 1 px slice
-						}
+				for (int row = 0; row < mat.Rows; ++row) {
+					Bgr pixel = img[row, 0];
+					if (pixel.Blue <= 180 && pixel.Green <= 180 && pixel.Red <= 180) {
+						return row + 1; // +1px for the border
+					}
+				}
+			}
+
+			return cardHeight;
+		}
+
+		public int GetEdgeOfCardFromOutside(Mat mat) {
+			// TODO: Ugh IplImage
+			using (var img = mat.ToImage<Bgr, byte>()) {
+				for (int col = mat.Cols - 1; col >= 0; --col) {
+					var pixel = img[0, col];
+					if ((pixel.Blue >= 230 && pixel.Green >= 230 && pixel.Red >= 230)) {
+						return col + 2; // +2px for the border
 					}
 				}
 
 				return 0;
 			}
 		}
-		
-		public bool IsCard(Mat img) {
+				
+		public bool IsCard(Mat img, Rectangle cardPos) {
+			using (Mat cardImg = new Mat(img, cardPos))
 			using (Mat imgHsv = new Mat())
 			using (Mat thresh = new Mat()) {
-				CvInvoke.CvtColor(img, imgHsv, ColorConversion.Bgr2Hsv);
+				CvInvoke.CvtColor(cardImg, imgHsv, ColorConversion.Bgr2Hsv);
 				CvInvoke.InRange(imgHsv, ScalarArrayColor.HsvGreenLowerBound, ScalarArrayColor.HsvGreenUpperBound, thresh);
 				return (CvInvoke.Mean(thresh).V0 < 200);
 			}
@@ -323,15 +361,18 @@ namespace SolitaireAI {
 		public override void OnThink() {
 			// First check if there's a card that we can move from the Tableau to the Foundation
 			//for (int tableSlot = 0; tableSlot < tableauSlots; ++tableSlot) {
-			for (int tableSlot = tableauSlots - 1; tableSlot >= 0; --tableSlot) {
-				Card tableCard = m_VisualState.m_Tableau[tableSlot];
-				if (tableCard.m_Number == Number.UNKNOWN) { continue; }
+			//foreach (List<Card> tableauSlot in m_VisualState.m_Tableau) {
+			for (int i = tableauSlots - 1; i >= 0; --i) {
+				List<Card> tableauSlot = m_VisualState.m_Tableau[i];
+
+				Card tableCard = tableauSlot[tableauSlot.Count - 1];
+				if (tableCard.m_Number == Number.NONE) { continue; }
 
 				for (int foundationSlot = 0; foundationSlot < foundationSlots; ++foundationSlot) {
 					Card foundationCard = m_VisualState.m_Foundation[foundationSlot];
 					//if (foundationCard.m_Number != Number.UNKNOWN) { continue; }
 					if (tableCard.m_Number != foundationCard.m_Number + 1) { continue; }
-					if (foundationCard.m_Suit != Suit.UNKNOWN && tableCard.m_Suit != foundationCard.m_Suit) { continue; }
+					if (foundationCard.m_Suit != Suit.NONE && tableCard.m_Suit != foundationCard.m_Suit) { continue; }
 
 					print("Move Tableau[" + tableCard + "] to Foundation[" + foundationCard + "]");
 					MoveCard(tableCard, foundationCard);
@@ -339,21 +380,29 @@ namespace SolitaireAI {
 				}
 			}
 
-
 			// Next check if there's a card that we can move from the Tableu elsewhere on the Tableu
 			//for (int tableSlot = 0; tableSlot < tableauSlots; ++tableSlot) {
-			for (int tableSlot = tableauSlots - 1; tableSlot >= 0; --tableSlot) {
-				Card tableCard = m_VisualState.m_Tableau[tableSlot];
-				if (tableCard.m_Number == Number.UNKNOWN) { continue; }
-				for (int potentialTableSlot = 0; potentialTableSlot < tableauSlots; ++potentialTableSlot) {
-					if (tableSlot == potentialTableSlot) { continue; }
+			for (int i = tableauSlots - 1; i >= 0; --i) {
+				List<Card> tableauSlot = m_VisualState.m_Tableau[i];
 
-					Card nextTableCard = m_VisualState.m_Tableau[potentialTableSlot];
+				Card tableCard;
+				for (int test = 0; ; ++test) {
+					tableCard = tableauSlot[test];
+					if (tableCard.m_Number == Number.NONE) { break; }
+					if (tableCard.m_Number != Number.LOCKED) { break; }
+				}
+
+				if (tableCard.m_Number == Number.NONE) { continue; }
+				
+				for (int j = 0; j < tableauSlots; ++j) {
+					if (j == i) { continue; }
+
+					List<Card> PotentialTableauSlot = m_VisualState.m_Tableau[j];
+					Card nextTableCard = PotentialTableauSlot[PotentialTableauSlot.Count - 1];
 
 					// Check if the new space is empty, and then see if this is a king that we can move there.
-					// TODO: This will just swap kings back and forth if there's empty spots until we know about cards that are locked face down.
-					if (nextTableCard.m_Number == Number.UNKNOWN) {
-						if (tableCard.m_Number == Number.King) {
+					if (nextTableCard.m_Number == Number.NONE) {
+						if (tableCard.m_Number == Number.King && tableCard.m_Number != tableauSlot[0].m_Number) {
 							print("Move Tableau[" + tableCard + "] to Tableau[" + nextTableCard + "]");
 							MoveCard(tableCard, nextTableCard);
 							return;
@@ -372,24 +421,25 @@ namespace SolitaireAI {
 			}
 
 			// Then see if we can move the card from the waste somewhere
-			if (m_VisualState.m_CardInWaste.m_Number != Number.UNKNOWN) {
+			if (m_VisualState.m_CardInWaste.m_Number != Number.NONE) {
 				for (int foundationSlot = 0; foundationSlot < foundationSlots; ++foundationSlot) {
 					Card foundationCard = m_VisualState.m_Foundation[foundationSlot];
 					//if (foundationCard.m_Number != Number.UNKNOWN) { continue; }
 					if (m_VisualState.m_CardInWaste.m_Number != foundationCard.m_Number + 1) { continue; }
-					if (foundationCard.m_Suit != Suit.UNKNOWN && m_VisualState.m_CardInWaste.m_Suit != foundationCard.m_Suit) { continue; }
+					if (foundationCard.m_Suit != Suit.NONE && m_VisualState.m_CardInWaste.m_Suit != foundationCard.m_Suit) { continue; }
 
 					print("Move " + m_VisualState.m_CardInWaste + " from the Waste to Foundation[" + foundationSlot + "]");
 					MoveCard(m_VisualState.m_CardInWaste, foundationCard);
 					return;
 				}
 
-				for (int potentialTableSlot = 0; potentialTableSlot < tableauSlots; ++potentialTableSlot) {
-					Card nextTableCard = m_VisualState.m_Tableau[potentialTableSlot];
+				//for (int potentialTableSlot = 0; potentialTableSlot < tableauSlots; ++potentialTableSlot) {
+				for (int j = 0; j < tableauSlots; ++j) {
+					List<Card> PotentialTableauSlot = m_VisualState.m_Tableau[j];
+					Card nextTableCard = PotentialTableauSlot[PotentialTableauSlot.Count - 1];
 
 					// Check if the new space is empty, and then see if this is a king that we can move there.
-					// TODO: This will just swap kings back and forth if there's empty spots until we know about cards that are locked face down.
-					if (nextTableCard.m_Number == Number.UNKNOWN) {
+					if (nextTableCard.m_Number == Number.NONE) {
 						if (m_VisualState.m_CardInWaste.m_Number == Number.King) {
 							print("Move " + m_VisualState.m_CardInWaste + " from the Waste to Tableau[" + nextTableCard + "]");
 							MoveCard(m_VisualState.m_CardInWaste, nextTableCard);
@@ -412,7 +462,6 @@ namespace SolitaireAI {
 			print("Flip a card from the deck");
 			Input.SendMouseLButtonDown(new Point(leftOffset + (cardWidth / 2), topOffsetRow1 + (cardHeight / 2)));
 			System.Threading.Thread.Sleep(666);
-			return;
 		}
 
 		public bool IsSameColor(Card a, Card b) {
@@ -442,18 +491,21 @@ namespace SolitaireAI {
 
 			state.AppendLine();
 			state.Append("Card In Waste: ");
-			state.AppendLine((m_VisualState.m_CardInWaste.m_Number != Number.UNKNOWN) ? m_VisualState.m_CardInWaste.ToString() : "----");
+			state.AppendLine((m_VisualState.m_CardInWaste.m_Number != Number.NONE) ? m_VisualState.m_CardInWaste.ToString() : "----");
 
 			state.AppendLine();
 			state.AppendLine("Foundation: ");
 			foreach (Card card in m_VisualState.m_Foundation) {
-				state.AppendLine((card.m_Number != Number.UNKNOWN) ? card.ToString() : "----");
+				state.AppendLine((card.m_Number != Number.NONE) ? card.ToString() : "----");
 			}
 
 			state.AppendLine();
 			state.AppendLine("Tableau: ");
-			foreach (Card card in m_VisualState.m_Tableau) {
-				state.AppendLine((card.m_Number != Number.UNKNOWN) ? card.ToString() : "----");
+			foreach (List<Card> tableuSlot in m_VisualState.m_Tableau) {
+				foreach (Card card in tableuSlot) {
+					state.AppendLine((card.m_Number != Number.NONE) ? card.ToString() : "----");
+				}
+				state.AppendLine();
 			}
 
 			return state.ToString();

@@ -24,13 +24,24 @@ namespace SolitaireAI {
 		}
 
 		private void Form1_Load(object sender, EventArgs e) {
+			FormClosing += new FormClosingEventHandler(Form1_FormClosing);
+
 			//m_BotInfoComboBox.Items.Add(new InputTestInfo());
 			m_BotInfoComboBox.Items.Add(new SolitaireInfo());
 			m_BotInfoComboBox.SelectedIndex = 0;
+			
+			RegisterHotKey(Handle, 0, MOD_CONTROL + MOD_WIN, (int)PInvoke.User32.VirtualKey.VK_X);
 
 			AttachProcess();
 		}
 
+
+		private void Form1_FormClosing(Object sender, FormClosingEventArgs e) {
+			UnregisterHotKey(Handle, 0);
+
+			DetachProcess();
+		}
+		
 		private void m_InjectButton_Click(object sender, EventArgs e) {
 			if (m_captureProcess == null) {
 				AttachProcess();
@@ -209,5 +220,27 @@ namespace SolitaireAI {
 
 			return base.ProcessCmdKey(ref msg, keyData);
 		}
+		protected override void WndProc(ref Message m) {
+			if (m.Msg == WM_HOTKEY && m.WParam == (IntPtr)0) {
+				if (m.LParam == (IntPtr)5767178) {
+					m_SteppingEnabledCheckbox.Checked = !m_SteppingEnabledCheckbox.Checked;
+				}
+			}
+
+			base.WndProc(ref m);
+		}
+
+		[System.Runtime.InteropServices.DllImport("User32")]
+		public static extern bool RegisterHotKey(IntPtr hWnd, int id, int fsModifiers, int vk);
+
+		[System.Runtime.InteropServices.DllImport("User32")]
+		public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+		public const int MOD_SHIFT = 0x4;
+		public const int MOD_CONTROL = 0x2;
+		public const int MOD_ALT = 0x1;
+		public const int WM_HOTKEY = 0x312;
+		public const int MOD_WIN = 0x0008;
+
 	}
 }

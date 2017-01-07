@@ -160,6 +160,7 @@
     </Compile>
     <Compile Include="IBot.cs" />
     <Compile Include="Input.cs" />
+    <Compile Include="InputTest.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Solitaire.cs" />

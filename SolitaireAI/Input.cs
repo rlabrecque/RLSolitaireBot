@@ -100,27 +100,27 @@ namespace SolitaireAI {
 
 			// TODO This was broken?!?!
 			//GetWindowInfo(Form1.m_captureProcess.Process.MainWindowHandle, ref info);
-			info.rcClient.left = 1920;
+			info.rcClient.left = 1920 * 2;
 			info.rcClient.top = 43;
 			
 			int x = info.rcClient.left + pos.X;
 			int y = info.rcClient.top + pos.Y;
 
-			int screenWidth = GetSystemMetrics(SystemMetric.SM_CXVIRTUALSCREEN);
-			int screenHeight = GetSystemMetrics(SystemMetric.SM_CYVIRTUALSCREEN);
+			int screenWidth = System.Windows.Forms.SystemInformation.VirtualScreen.Width;
+			int screenHeight = System.Windows.Forms.SystemInformation.VirtualScreen.Height;
 
-			int XSCALEFACTOR = 65535 / (screenWidth - 1);
-			int YSCALEFACTOR = 65535 / (screenHeight - 1);
+			float XSCALEFACTOR = 65535f / (screenWidth - 1);
+			float YSCALEFACTOR = 65535f / (screenHeight - 1);
 
-			int nx = x * XSCALEFACTOR;
-			int ny = y * YSCALEFACTOR;
+			int nx = (int)(x * XSCALEFACTOR);
+			int ny = (int)(y * YSCALEFACTOR);
 
-			/*Console.WriteLine("pos.X: " + pos.X + " pos.Y " + pos.Y);
+			Console.WriteLine("pos.X: " + pos.X + " pos.Y " + pos.Y);
 			Console.WriteLine("info.rcClient.left:" + info.rcClient.left + " info.rcClient.top: " + info.rcClient.top);
 			Console.WriteLine("x: " + x + " y: " + y);
 			Console.WriteLine("screenWidth: " + screenWidth + " screenHeight: " + screenHeight);
 			Console.WriteLine("XSCALEFACTOR: " + XSCALEFACTOR + " YSCALEFACTOR: " + YSCALEFACTOR);
-			Console.WriteLine("nx: " + nx + " ny: " + ny);*/
+			Console.WriteLine("nx: " + nx + " ny: " + ny);
 
 			return new Point(nx, ny);
 		}
