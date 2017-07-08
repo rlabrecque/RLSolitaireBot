@@ -1,4 +1,5 @@
 *.suo
 *.user
-bin
-obj
+/.vs/
+/SolitaireAI/bin/
+/SolitaireAI/obj/
